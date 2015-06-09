@@ -9,41 +9,74 @@ def _window(lst):
 	nexts = islice(cycle(nexts), 1, None)
 	return izip(prevs, items, nexts)
 
-class _Vertex:
-	def __init__(self, point, prev, next):
-		self.point = point
-		self.vec_prev = point.connect(prev).v.normalize()
-		self.vec_next = point.connect(next).v.normalize()
-		self.bisector = Ray2(self.point, self.vec_prev + self.vec_next)
 
-	def __eq__(self, other):
-		return self.point == other.point
-	def __ne__(self, other):
-		return not self.__eq__(other)
-
-class _Intersection:
-	def __init__(self, point, origin_left, origin_right):
+class _LAVertex:
+	def __init__(self, point, prev, next, edge_left, edge_right):
 		self.point = point
-		self.origin = [origin_left, origin_right]
+		self.edge_right = edge_right
+		self.edge_left = edge_left
+		self.prev = prev
+		self.next = next
+		self._bisector = Ray2(self.point, edge_left.v.normalize() + edge_right.v.normalize())
+
+	@property
+	def bisector(self):
+		return self._bisector
+
+	def __str__(self):
+		return self.point.__str__()
+
+
+class _LAV:
+	def __init__(self, polygon):
+		self.head = None
+
+		for prev, point, next in _window(polygon):
+			vertex = _LAVertex(point, None, None, LineSegment2(point, prev), LineSegment2(point, next))
+			if self.head == None:
+				self.head = vertex
+				vertex.prev = vertex.next = vertex
+			else:
+				vertex.next = self.head
+				vertex.prev = self.head.prev
+				vertex.prev.next = vertex
+				self.head.prev = vertex
+
+	def __iter__(self):
+		cur = self.head
+		while True:
+			yield cur
+			cur = cur.next
+			if cur == self.head:
+				raise StopIteration
+
+	def _show(self):
+		cur = self.head
+		while True:
+			print cur
+			cur = cur.next
+			if cur == self.head:
+				break
+
 
 def skeletonize(polygon):
+	lav = _LAV(polygon)
 	output = []
-	lav = []
 	prioque = PriorityQueue()
 
-	for prev, point, next in _window(polygon):
-		lav.append(_Vertex(point, prev, next))
-
-	for prev, vertex, next in _window(lav):
-		i_prev = vertex.bisector.intersect(prev.bisector)
-		i_next = vertex.bisector.intersect(next.bisector)
+	for vertex in lav:
+		i_prev = vertex.bisector.intersect(vertex.prev.bisector)
+		i_next = vertex.bisector.intersect(vertex.next.bisector)
 		if vertex.point.distance(i_prev) < vertex.point.distance(i_next):
-			prioque.put((vertex.point.distance(i_prev), i_prev, vertex, prev))
+			prioque.put((vertex.point.distance(i_prev), i_prev, vertex, vertex.prev))
 		else:
-			prioque.put((vertex.point.distance(i_next), i_next, vertex, next))
+			prioque.put((vertex.point.distance(i_next), i_next, vertex, vertex.next))
 
 	while not prioque.empty():
 		i = prioque.get()
+
+		output.append((i[1], i[2].point))
+		output.append((i[1], i[3].point))
 	return output
 
 
@@ -64,10 +97,9 @@ if __name__ == "__main__":
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
-	#skeleton = skeletonize(poly)
-	#for point, next in zip(skeleton, skeleton[1:]+skeleton[:1]):
-	#	draw.line((point.x, point.y, next.x, next.y), fill=0)
-
-	for line in skeletonize(poly):
-		draw.line((line[0].x, line[0].y, line[1].x, line[1].y), fill="red")
-	im.show();
+	skeleton = skeletonize(poly)
+	for res in skeleton:
+		print res
+	#for line in skeletonize(poly):
+	#	draw.line((line[0].x, line[0].y, line[1].x, line[1].y), fill="red")
+	#im.show();
