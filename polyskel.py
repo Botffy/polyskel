@@ -29,7 +29,14 @@ class _LAVertex:
 	def intersect_event(self):
 		i_prev = self.bisector.intersect(self.prev.bisector)
 		i_next = self.bisector.intersect(self.next.bisector)
-		if self.point.distance(i_prev) < self.point.distance(i_next):
+
+		if i_prev is None and i_next is None:
+			return None
+
+		prevdist = self.point.distance(i_prev) if i_prev is not None else float("inf")
+		nextdist = self.point.distance(i_next) if i_next is not None else float("inf")
+
+		if prevdist < nextdist:
 			event = Event(self.point.distance(i_prev), i_prev, self.prev, self)
 		else:
 			event = Event(self.point.distance(i_next), i_next, self, self.next)
@@ -94,11 +101,15 @@ class _LAV:
 			if cur == self.head:
 				break
 
+class _EventQueue(PriorityQueue):
+	def put(self, value):
+		if value is not None:
+			PriorityQueue.put(self, value)
 
 def skeletonize(polygon):
 	lav = _LAV(polygon)
 	output = []
-	prioque = PriorityQueue()
+	prioque = _EventQueue()
 
 	for vertex in lav:
 		prioque.put(vertex.intersect_event())
@@ -134,7 +145,7 @@ if __name__ == "__main__":
 	poly = [
 		Point2(30., 20.),
 		Point2(30., 120.),
-		Point2(90., 155.),
+		Point2(90., 70.),
 		Point2(160., 140.),
 		Point2(178., 93.),
 		Point2(160., 20.),
