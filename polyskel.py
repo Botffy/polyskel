@@ -9,22 +9,45 @@ def _window(lst):
 	nexts = islice(cycle(nexts), 1, None)
 	return izip(prevs, items, nexts)
 
+Event = namedtuple("Event", "distance intersection_point vertex_a vertex_b")
 
 class _LAVertex:
-	def __init__(self, point, prev, next, edge_left, edge_right):
+	def __init__(self, point, edge_left, edge_right):
 		self.point = point
 		self.edge_right = edge_right
 		self.edge_left = edge_left
-		self.prev = prev
-		self.next = next
+		self.prev = None
+		self.next = None
 		self._bisector = Ray2(self.point, edge_left.v.normalize() + edge_right.v.normalize())
+		self._valid = True;
 
 	@property
 	def bisector(self):
 		return self._bisector
 
+	def intersect_event(self):
+		i_prev = self.bisector.intersect(self.prev.bisector)
+		i_next = self.bisector.intersect(self.next.bisector)
+		if self.point.distance(i_prev) < self.point.distance(i_next):
+			event = Event(self.point.distance(i_prev), i_prev, self.prev, self)
+		else:
+			event = Event(self.point.distance(i_next), i_next, self, self.next)
+		return event
+
+	def invalidate(self):
+		self._valid = False
+
+	@property
+	def is_valid(self):
+		return self._valid
+
 	def __str__(self):
 		return self.point.__str__()
+
+	def __eq__(self, other):
+		if other is None:
+			return False
+		return self.point == other.point
 
 
 class _LAV:
@@ -32,7 +55,7 @@ class _LAV:
 		self.head = None
 
 		for prev, point, next in _window(polygon):
-			vertex = _LAVertex(point, None, None, LineSegment2(point, prev), LineSegment2(point, next))
+			vertex = _LAVertex(point, LineSegment2(point, prev), LineSegment2(point, next))
 			if self.head == None:
 				self.head = vertex
 				vertex.prev = vertex.next = vertex
@@ -41,6 +64,18 @@ class _LAV:
 				vertex.prev = self.head.prev
 				vertex.prev.next = vertex
 				self.head.prev = vertex
+
+	def unify(self, vertex_a, vertex_b, point):
+		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right)
+		vertex_a.prev.next = replacement
+		vertex_b.next.prev = replacement
+		replacement.prev = vertex_a.prev
+		replacement.next = vertex_b.next
+
+		vertex_a.invalidate()
+		vertex_b.invalidate()
+
+		return replacement
 
 	def __iter__(self):
 		cur = self.head
@@ -64,21 +99,29 @@ def skeletonize(polygon):
 	output = []
 	prioque = PriorityQueue()
 
-	Event = namedtuple("Event", "distance intersection_point vertex1 vertex2")
-
 	for vertex in lav:
-		i_prev = vertex.bisector.intersect(vertex.prev.bisector)
-		i_next = vertex.bisector.intersect(vertex.next.bisector)
-		if vertex.point.distance(i_prev) < vertex.point.distance(i_next):
-			prioque.put(Event(vertex.point.distance(i_prev), i_prev, vertex, vertex.prev))
-		else:
-			prioque.put(Event(vertex.point.distance(i_next), i_next, vertex, vertex.next))
+		prioque.put(vertex.intersect_event())
 
 	while not prioque.empty():
 		i = prioque.get()
 
-		output.append((i.intersection_point, i.vertex1.point))
-		output.append((i.intersection_point, i.vertex2.point))
+		if not (i.vertex_a.is_valid or i.vertex_b.is_valid):
+			continue
+		else:
+			if i.vertex_a.prev.prev == i.vertex_b:
+				# peak event
+				print "peak event"
+				output.append((i.intersection_point, i.vertex_a.point))
+				output.append((i.intersection_point, i.vertex_b.point))
+				output.append((i.intersection_point, i.vertex_a.prev.point))
+				vertex = lav.unify(i.vertex_a, i.vertex_b, i.intersection_point)
+			else:
+				# edge event
+				print "edge event"
+				vertex = lav.unify(i.vertex_a, i.vertex_b, i.intersection_point)
+				output.append((i.intersection_point, i.vertex_a.point))
+				output.append((i.intersection_point, i.vertex_b.point))
+				prioque.put(vertex.intersect_event())
 	return output
 
 
@@ -92,7 +135,6 @@ if __name__ == "__main__":
 		Point2(160., 20.),
 	]
 
-
 	im = Image.new("RGB", (200, 200), "white");
 	draw = ImageDraw.Draw(im);
 
@@ -102,6 +144,7 @@ if __name__ == "__main__":
 	skeleton = skeletonize(poly)
 	for res in skeleton:
 		print res
-	#for line in skeletonize(poly):
-	#	draw.line((line[0].x, line[0].y, line[1].x, line[1].y), fill="red")
-	#im.show();
+
+	for line in skeleton:
+		draw.line((line[0].x, line[0].y, line[1].x, line[1].y), fill="red")
+	im.show();
