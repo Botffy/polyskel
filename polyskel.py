@@ -1,7 +1,7 @@
 from euclid import *
 from Queue import PriorityQueue
 from itertools import cycle, chain, islice, izip, tee
-
+from collections import namedtuple
 
 def _window(lst):
 	prevs, items, nexts = tee(lst, 3)
@@ -64,19 +64,21 @@ def skeletonize(polygon):
 	output = []
 	prioque = PriorityQueue()
 
+	Event = namedtuple("Event", "distance intersection_point vertex1 vertex2")
+
 	for vertex in lav:
 		i_prev = vertex.bisector.intersect(vertex.prev.bisector)
 		i_next = vertex.bisector.intersect(vertex.next.bisector)
 		if vertex.point.distance(i_prev) < vertex.point.distance(i_next):
-			prioque.put((vertex.point.distance(i_prev), i_prev, vertex, vertex.prev))
+			prioque.put(Event(vertex.point.distance(i_prev), i_prev, vertex, vertex.prev))
 		else:
-			prioque.put((vertex.point.distance(i_next), i_next, vertex, vertex.next))
+			prioque.put(Event(vertex.point.distance(i_next), i_next, vertex, vertex.next))
 
 	while not prioque.empty():
 		i = prioque.get()
 
-		output.append((i[1], i[2].point))
-		output.append((i[1], i[3].point))
+		output.append((i.intersection_point, i.vertex1.point))
+		output.append((i.intersection_point, i.vertex2.point))
 	return output
 
 
