@@ -1,3 +1,4 @@
+import logging as log
 from euclid import *
 from Queue import PriorityQueue
 from itertools import cycle, chain, islice, izip, tee
@@ -42,7 +43,7 @@ class _LAVertex:
 		return self._valid
 
 	def __str__(self):
-		return self.point.__str__()
+		return "({0};{1})".format(self.point.x, self.point.y)
 
 	def __eq__(self, other):
 		if other is None:
@@ -110,14 +111,14 @@ def skeletonize(polygon):
 		else:
 			if i.vertex_a.prev.prev == i.vertex_b:
 				# peak event
-				print "peak event"
+				log.debug("Peak event at intersection %s from <%s,%s,%s>", i.intersection_point, i.vertex_a, i.vertex_b, i.vertex_a.prev)
 				output.append((i.intersection_point, i.vertex_a.point))
 				output.append((i.intersection_point, i.vertex_b.point))
 				output.append((i.intersection_point, i.vertex_a.prev.point))
-				vertex = lav.unify(i.vertex_a, i.vertex_b, i.intersection_point)
+				break
 			else:
 				# edge event
-				print "edge event"
+				log.debug("Edge event at intersection %s from <%s,%s>", i.intersection_point, i.vertex_a, i.vertex_b)
 				vertex = lav.unify(i.vertex_a, i.vertex_b, i.intersection_point)
 				output.append((i.intersection_point, i.vertex_a.point))
 				output.append((i.intersection_point, i.vertex_b.point))
@@ -128,10 +129,14 @@ def skeletonize(polygon):
 if __name__ == "__main__":
 	import Image, ImageDraw
 
+	log.basicConfig(level=log.DEBUG)
+
 	poly = [
 		Point2(30., 20.),
 		Point2(30., 120.),
+		Point2(90., 155.),
 		Point2(160., 140.),
+		Point2(178., 93.),
 		Point2(160., 20.),
 	]
 
