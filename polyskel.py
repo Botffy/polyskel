@@ -54,23 +54,15 @@ class _LAVertex:
 					if b is not None:
 						events.append( SplitEvent(self.point.distance(b), b, self) )
 
-		if self.is_reflex:
-			return None
-
 		i_prev = self.bisector.intersect(self.prev.bisector)
 		i_next = self.bisector.intersect(self.next.bisector)
 
-		if i_prev is None and i_next is None:
-			return None
+		if i_prev is not None:
+			events.append(EdgeEvent(self.point.distance(i_prev), i_prev, self.prev, self))
+		if i_next is not None:
+			events.append(EdgeEvent(self.point.distance(i_next), i_next, self, self.next))
 
-		prevdist = self.point.distance(i_prev) if i_prev is not None else float("inf")
-		nextdist = self.point.distance(i_next) if i_next is not None else float("inf")
-
-		if prevdist < nextdist:
-			event = EdgeEvent(self.point.distance(i_prev), i_prev, self.prev, self)
-		else:
-			event = EdgeEvent(self.point.distance(i_next), i_next, self, self.next)
-		return event
+		return None if not events else min(events, key=lambda event: event.distance)
 
 	def invalidate(self):
 		self._valid = False
@@ -155,13 +147,13 @@ def skeletonize(polygon):
 
 	for vertex in lav:
 		prioque.put(vertex.intersect_event())
-		draw.line((vertex.bisector.p.x, vertex.bisector.p.y, vertex.bisector.p.x+vertex.bisector.v.x*100, vertex.bisector.p.y+vertex.bisector.v.y*100), fill="blue")
 
 	while not prioque.empty():
 		i = prioque.get()
-		if not (i.vertex_a.is_valid or i.vertex_b.is_valid):
-			continue
-		elif isinstance(i, EdgeEvent):
+		if isinstance(i, EdgeEvent):
+			if not (i.vertex_a.is_valid or i.vertex_b.is_valid):
+				continue
+
 			if i.vertex_a.prev.prev == i.vertex_b:
 				# peak event
 				log.debug("%.2f Peak event at intersection %s from <%s,%s,%s>", i.distance, i.intersection_point, i.vertex_a, i.vertex_b, i.vertex_a.prev)
@@ -176,6 +168,8 @@ def skeletonize(polygon):
 				output.append((i.intersection_point, i.vertex_a.point))
 				output.append((i.intersection_point, i.vertex_b.point))
 				prioque.put(vertex.intersect_event())
+		elif isinstance(i, SplitEvent):
+			log.debug("%.2f Split event at intersection %s from vertex %s", i.distance, i.intersection_point, i.vertex)
 	return output
 
 
@@ -196,7 +190,7 @@ if __name__ == "__main__":
 	#poly = [
 	#	Point2(30., 20.),
 	#	Point2(30., 120.),
-	#	Point2(90., 70.),
+	#	Point2(90., 70.), #170
 	#	Point2(160., 140.),
 	#	Point2(178., 93.),
 	#	Point2(160., 20.),
