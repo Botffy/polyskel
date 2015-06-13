@@ -1,6 +1,6 @@
 import logging
+import heapq
 from euclid import *
-from Queue import PriorityQueue
 from itertools import cycle, chain, islice, izip, tee
 from collections import namedtuple
 
@@ -86,7 +86,7 @@ class _LAVertex:
 	def has_edge(self, edge):
 		return edge.v.normalized() == self.edge_left.v.normalized() and edge.p == self.edge_left.p
 
-	def intersect_event(self):
+	def next_event(self):
 		events = []
 		if self.is_reflex:
 			candidates = []
@@ -272,10 +272,23 @@ class _LAV:
 			if cur == self.head:
 				break
 
-class _EventQueue(PriorityQueue):
-	def put(self, value):
-		if value is not None:
-			PriorityQueue.put(self, value)
+class _EventQueue:
+	def __init__(self):
+		self.__data = []
+
+	def put(self, item):
+		if item is not None:
+			heapq.heappush(self.__data, item)
+
+	def get(self):
+		return heapq.heappop(self.__data)
+
+	def empty(self):
+		return len(self.__data)==0
+
+	def peek(self):
+		return self.__data[0]
+
 
 def skeletonize(polygon):
 	slav = _SLAV(polygon)
@@ -283,7 +296,7 @@ def skeletonize(polygon):
 	prioque = _EventQueue()
 
 	for vertex in slav._lavs[0]: # fixme
-		prioque.put(vertex.intersect_event())
+		prioque.put(vertex.next_event())
 
 	while not prioque.empty():
 		i = prioque.get()
@@ -311,7 +324,7 @@ def skeletonize(polygon):
 				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_a.point.x, i.vertex_a.point.y), fill="red")
 				output.append((i.intersection_point, i.vertex_b.point))
 				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_b.point.x, i.vertex_b.point.y), fill="red")
-				prioque.put(vertex.intersect_event())
+				prioque.put(vertex.next_event())
 		elif isinstance(i, _SplitEvent):
 			if not i.vertex.is_valid:
 				continue
@@ -321,7 +334,7 @@ def skeletonize(polygon):
 			output.append((i.intersection_point, i.vertex.point))
 			debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex.point.x, i.vertex.point.y), fill="red")
 			for v in vertices:
-				prioque.put(v.intersect_event())
+				prioque.put(v.next_event())
 
 		debug.show()
 	return output
