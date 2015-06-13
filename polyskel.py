@@ -293,27 +293,56 @@ if __name__ == "__main__":
 
 	logging.basicConfig(level=logging.DEBUG)
 
-	poly = [
-		Point2(40,50),
-		Point2(40, 520),
-		Point2(625,425),
-		Point2(500,325),
-		Point2(635,250),
-		Point2(635,10),
-		Point2(250,40),
-		Point2(200,200),
-		Point2(100,50)
-	]
-	#poly = [
-	#	Point2(30., 20.),
-	#	Point2(30., 120.),
-	#	Point2(90., 70.), #170
-	#	Point2(160., 140.),
-	#	Point2(178., 93.),
-	#	Point2(160., 20.),
-	#]
+	examples = {
+		'the sacred polygon': [
+			Point2(40,50),
+			Point2(40, 520),
+			Point2(625,425),
+			Point2(500,325),
+			Point2(635,250),
+			Point2(635,10),
+			Point2(250,40),
+			Point2(200,200),
+			Point2(100,50)
+		],
+		'simple': [
+			Point2(30., 20.),
+			Point2(30., 120.),
+			Point2(90., 70.), #170
+			Point2(160., 140.),
+			Point2(178., 93.),
+			Point2(160., 20.),
+		],
+		"multiply split": [
+			Point2(40., 60.),
+			Point2(100., 310.),
+			Point2(180., 180.),
+			Point2(260., 310.),
+			Point2(340., 150.),
+			Point2(420., 310.),
+			Point2(500., 180.),
+			Point2(580., 310.),
+			Point2(640., 60.)
+		],
+		'rectangle': [
+			Point2(40., 40.),
+			Point2(40., 310.),
+			Point2(520., 310.),
+			Point2(520., 40.)
+		],
+		"iron cross": [	# doesn't work
+			Point2(100., 50),
+			Point2(300., 50),
+			Point2(250., 150.),
+			Point2(350., 100.),
+			Point2(350., 350.),
+			Point2(50., 350.),
+			Point2(50., 100.),
+			Point2(150., 150.)
+		]
+	}
 
-
+	poly = examples["iron cross"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
