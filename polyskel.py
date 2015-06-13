@@ -4,8 +4,31 @@ from Queue import PriorityQueue
 from itertools import cycle, chain, islice, izip, tee
 from collections import namedtuple
 
-
 log = logging.getLogger(__name__)
+
+class _Debug:
+	def __init__(self, image):
+		if image is not None:
+			self.im = image[0]
+			self.draw = image[1]
+			self.do = True
+		else:
+			self.do = False
+
+	def line(self, *args, **kwargs):
+		if self.do:
+			self.draw.line(*args, **kwargs)
+
+	def rectangle(self, *args, **kwargs):
+		if self.do:
+			self.draw.rectangle(*args, **kwargs)
+
+	def show(self):
+		if self.do:
+			self.im.show()
+
+
+debug = _Debug(None)
 
 def _window(lst):
 	prevs, items, nexts = tee(lst, 3)
@@ -34,15 +57,16 @@ def _side(point, line):
 	b = line.p.y
 
 class _LAVertex:
-	def __init__(self, point, edge_left, edge_right, lav=None):
+	def __init__(self, point, edge_left, edge_right):
 		self.point = point
 		self.edge_left = edge_left
 		self.edge_right = edge_right
 		self.prev = None
 		self.next = None
-		self.lav = lav
+		self.lav = None
 		self._valid = True;
 		self._bisector = Ray2(self.point, (edge_left.v.normalized()*-1 + edge_right.v.normalized())*(-1 if self.is_reflex else 1) )
+		debug.line((self.bisector.p.x, self.bisector.p.y, self.bisector.p.x+self.bisector.v.x*100, self.bisector.p.y+self.bisector.v.y*100), fill="blue")
 
 	@property
 	def bisector(self):
@@ -148,9 +172,7 @@ class _SLAV:
 
 		res = []
 		new_lavs = [_LAV.from_chain(v1, self), _LAV.from_chain(v2, self)]
-		colors = ["orange", "blue"]
-		offset = [0, 5]
-		for l, col, o in zip(new_lavs, colors, offset):
+		for l in new_lavs:
 			if len(l) > 2:
 				self._lavs.insert(idx, l)
 				res.append(l.head)
@@ -180,7 +202,8 @@ class _LAV:
 		lav = cls(slav)
 		for prev, point, next in _window(polygon):
 			lav._len += 1
-			vertex = _LAVertex(point, LineSegment2(prev, point), LineSegment2(point, next), lav)
+			vertex = _LAVertex(point, LineSegment2(prev, point), LineSegment2(point, next))
+			vertex.lav = lav
 			if lav.head == None:
 				lav.head = vertex
 				vertex.prev = vertex.next = vertex
@@ -205,7 +228,8 @@ class _LAV:
 		return self._slav.original_polygon
 
 	def unify(self, vertex_a, vertex_b, point):
-		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right, vertex_a.lav)
+		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right)
+		replacement.lav = self
 
 		if self.head in [vertex_a, vertex_b]:
 			self.head = replacement
@@ -264,14 +288,19 @@ def skeletonize(polygon):
 				i.vertex_b.invalidate()
 				i.vertex_a.prev.invalidate()
 				output.append((i.intersection_point, i.vertex_a.point))
+				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_a.point.x, i.vertex_a.point.y), fill="red")
 				output.append((i.intersection_point, i.vertex_b.point))
+				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_b.point.x, i.vertex_b.point.y), fill="red")
 				output.append((i.intersection_point, i.vertex_a.prev.point))
+				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_a.prev.point.x, i.vertex_a.prev.point.y), fill="red")
 			else:
 				# edge event
 				log.info("%.2f Edge event at intersection %s from <%s,%s>", i.distance, i.intersection_point, i.vertex_a, i.vertex_b)
 				vertex = slav.unify(i.vertex_a, i.vertex_b, i.intersection_point)
 				output.append((i.intersection_point, i.vertex_a.point))
+				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_a.point.x, i.vertex_a.point.y), fill="red")
 				output.append((i.intersection_point, i.vertex_b.point))
+				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_b.point.x, i.vertex_b.point.y), fill="red")
 				prioque.put(vertex.intersect_event())
 		elif isinstance(i, _SplitEvent):
 			if not i.vertex.is_valid:
@@ -280,18 +309,23 @@ def skeletonize(polygon):
 			log.info("%.2f Split event at intersection %s from vertex %s, for edge %s", i.distance, i.intersection_point, i.vertex, i.opposite_edge)
 			vertices = slav.split(i)
 			output.append((i.intersection_point, i.vertex.point))
+			debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex.point.x, i.vertex.point.y), fill="red")
 			for v in vertices:
 				prioque.put(v.intersect_event())
+
+		debug.show()
 	return output
 
 
 if __name__ == "__main__":
 	import Image, ImageDraw
-
 	im = Image.new("RGB", (650, 650), "white");
 	draw = ImageDraw.Draw(im);
+	debug = _Debug((im, draw))
 
-	logging.basicConfig(level=logging.DEBUG)
+
+	logging.basicConfig(level=logging.INFO)
+
 
 	examples = {
 		'the sacred polygon': [
@@ -330,19 +364,19 @@ if __name__ == "__main__":
 			Point2(520., 310.),
 			Point2(520., 40.)
 		],
-		"iron cross": [	# doesn't work
+		"iron cross": [		# doesn't work
 			Point2(100., 50),
-			Point2(300., 50),
-			Point2(250., 150.),
-			Point2(350., 100.),
-			Point2(350., 350.),
-			Point2(50., 350.),
+			Point2(150., 150.),
 			Point2(50., 100.),
-			Point2(150., 150.)
+			Point2(50., 350.),
+			Point2(350., 350.),
+			Point2(350., 100.),
+			Point2(250., 150.),
+			Point2(300., 50)
 		]
 	}
 
-	poly = examples["iron cross"]
+	poly = examples["the sacred polygon"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
