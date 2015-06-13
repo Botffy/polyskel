@@ -40,6 +40,7 @@ def _cross(a, b):
 	res = a.x*b.y - b.x*a.y
 	return res
 
+
 class _SplitEvent(namedtuple("_SplitEvent", "distance, intersection_point, vertex, opposite_edge")):
 	__slots__ = ()
 	def __str__(self):
@@ -57,15 +58,21 @@ def _side(point, line):
 	b = line.p.y
 
 class _LAVertex:
-	def __init__(self, point, edge_left, edge_right):
+	def __init__(self, point, edge_left, edge_right, creator_vectors=None):
 		self.point = point
 		self.edge_left = edge_left
 		self.edge_right = edge_right
 		self.prev = None
 		self.next = None
 		self.lav = None
-		self._valid = True;
-		self._bisector = Ray2(self.point, (edge_left.v.normalized()*-1 + edge_right.v.normalized())*(-1 if self.is_reflex else 1) )
+		self._valid = True; # this should be handled better. Maybe membership in lav implies validity?
+
+		if creator_vectors is None:
+			creator_vectors = (edge_left.v.normalized()*-1, edge_right.v.normalized())
+
+		self._is_reflex = (_cross(*creator_vectors)) < 0
+		self._bisector = Ray2(self.point, operator.add(*creator_vectors) * (-1 if self.is_reflex else 1))
+		log.info("Created vertex %s", self.__repr__())
 		debug.line((self.bisector.p.x, self.bisector.p.y, self.bisector.p.x+self.bisector.v.x*100, self.bisector.p.y+self.bisector.v.y*100), fill="blue")
 
 	@property
@@ -74,7 +81,7 @@ class _LAVertex:
 
 	@property
 	def is_reflex(self):
-		return (-self.edge_left.v.x * self.edge_right.v.y - self.edge_left.v.y * -self.edge_right.v.x) < 0
+		return self._is_reflex
 
 	def has_edge(self, edge):
 		return edge.v.normalized() == self.edge_left.v.normalized() and edge.p == self.edge_left.p
@@ -132,7 +139,10 @@ class _LAVertex:
 		return self._valid
 
 	def __str__(self):
-		return "({0:.2f};{1:.2f})".format(self.point.x, self.point.y)
+		return "Vertex ({:.2f};{:.2f})".format(self.point.x, self.point.y)
+
+	def __repr__(self):
+		return "Vertex ({}) ({:.2f};{:.2f}), bisector {}, edges {} {}".format("reflex" if self.is_reflex else "convex", self.point.x, self.point.y, self.bisector, self.edge_left, self.edge_right)
 
 class _SLAV:
 	def __init__(self, polygon):
@@ -228,7 +238,7 @@ class _LAV:
 		return self._slav.original_polygon
 
 	def unify(self, vertex_a, vertex_b, point):
-		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right)
+		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right, (vertex_b.bisector.v, vertex_a.bisector.v))
 		replacement.lav = self
 
 		if self.head in [vertex_a, vertex_b]:
@@ -321,7 +331,7 @@ if __name__ == "__main__":
 	import Image, ImageDraw
 	im = Image.new("RGB", (650, 650), "white");
 	draw = ImageDraw.Draw(im);
-	debug = _Debug((im, draw))
+	debug = _Debug(None)
 
 
 	logging.basicConfig(level=logging.INFO)
@@ -376,7 +386,7 @@ if __name__ == "__main__":
 		]
 	}
 
-	poly = examples["the sacred polygon"]
+	poly = examples["iron cross"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
