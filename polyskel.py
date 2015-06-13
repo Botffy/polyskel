@@ -17,17 +17,17 @@ def _cross(a, b):
 	res = a.x*b.y - b.x*a.y
 	return res
 
-class SplitEvent(namedtuple("SplitEvent", "distance, intersection_point, vertex, opposite_edge")):
+class _SplitEvent(namedtuple("_SplitEvent", "distance, intersection_point, vertex, opposite_edge")):
 	__slots__ = ()
 	def __str__(self):
 		return "{} Split event @ {} from {} to {}".format(self.distance, self.intersection_point, self.vertex, self.opposite_edge)
 
-class EdgeEvent(namedtuple("EdgeEvent", "distance intersection_point vertex_a vertex_b")):
+class _EdgeEvent(namedtuple("_EdgeEvent", "distance intersection_point vertex_a vertex_b")):
 	__slots__ = ()
 	def __str__(self):
 		return "{} Edge event @ {} between {} and {}".format(self.distance, self.intersection_point, self.vertex_a, self.vertex_b)
 
-OriginalEdge = namedtuple("OriginalEdge", "edge bisector_left, bisector_right")
+_OriginalEdge = namedtuple("_OriginalEdge", "edge bisector_left, bisector_right")
 
 def _side(point, line):
 	a = line.p.x
@@ -85,7 +85,7 @@ class _LAVertex:
 						continue
 
 					log.debug("\t\tFound valid candidate %s", b)
-					candidates.append( SplitEvent(Line2(edge.edge).distance(b), b, self, edge.edge) )
+					candidates.append( _SplitEvent(Line2(edge.edge).distance(b), b, self, edge.edge) )
 			if candidates:
 				events.append( min(candidates, key=lambda event: self.point.distance(event.intersection_point)) )
 
@@ -93,9 +93,9 @@ class _LAVertex:
 		i_next = self.bisector.intersect(self.next.bisector)
 
 		if i_prev is not None:
-			events.append(EdgeEvent(Line2(self.edge_left).distance(i_prev), i_prev, self.prev, self))
+			events.append(_EdgeEvent(Line2(self.edge_left).distance(i_prev), i_prev, self.prev, self))
 		if i_next is not None:
-			events.append(EdgeEvent(Line2(self.edge_right).distance(i_next), i_next, self, self.next))
+			events.append(_EdgeEvent(Line2(self.edge_right).distance(i_next), i_next, self, self.next))
 
 		return None if not events else min(events, key=lambda event: event.distance)
 
@@ -116,7 +116,7 @@ class _SLAV:
 		self._lavs = [root]
 
 		#store original polygon for calculating split events
-		self._polygon = [OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector) for vertex in root]
+		self._polygon = [_OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector) for vertex in root]
 
 	def unify(self, vertex_a, vertex_b, point):
 		return vertex_a.lav.unify(vertex_a, vertex_b, point)
@@ -253,7 +253,7 @@ def skeletonize(polygon):
 
 	while not prioque.empty():
 		i = prioque.get()
-		if isinstance(i, EdgeEvent):
+		if isinstance(i, _EdgeEvent):
 			if not i.vertex_a.is_valid or not i.vertex_b.is_valid:
 				continue
 
@@ -273,7 +273,7 @@ def skeletonize(polygon):
 				output.append((i.intersection_point, i.vertex_a.point))
 				output.append((i.intersection_point, i.vertex_b.point))
 				prioque.put(vertex.intersect_event())
-		elif isinstance(i, SplitEvent):
+		elif isinstance(i, _SplitEvent):
 			if not i.vertex.is_valid:
 				continue
 
