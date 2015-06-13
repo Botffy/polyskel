@@ -1,13 +1,11 @@
-import logging as log
+import logging
 from euclid import *
 from Queue import PriorityQueue
 from itertools import cycle, chain, islice, izip, tee
 from collections import namedtuple
 
-import Image, ImageDraw
 
-im = Image.new("RGB", (650, 650), "white");
-draw = ImageDraw.Draw(im);
+log = logging.getLogger(__name__)
 
 def _window(lst):
 	prevs, items, nexts = tee(lst, 3)
@@ -261,45 +259,39 @@ def skeletonize(polygon):
 
 			if i.vertex_a.prev.prev == i.vertex_b:
 				# peak event
-				log.debug("%.2f Peak event at intersection %s from <%s,%s,%s>", i.distance, i.intersection_point, i.vertex_a, i.vertex_b, i.vertex_a.prev)
+				log.info("%.2f Peak event at intersection %s from <%s,%s,%s>", i.distance, i.intersection_point, i.vertex_a, i.vertex_b, i.vertex_a.prev)
 				i.vertex_a.invalidate()
 				i.vertex_b.invalidate()
 				i.vertex_a.prev.invalidate()
 				output.append((i.intersection_point, i.vertex_a.point))
-				draw.line(((output[-1])[0].x, (output[-1])[0].y, (output[-1])[1].x, (output[-1])[1].y), fill="red")
 				output.append((i.intersection_point, i.vertex_b.point))
-				draw.line(((output[-1])[0].x, (output[-1])[0].y, (output[-1])[1].x, (output[-1])[1].y), fill="red")
 				output.append((i.intersection_point, i.vertex_a.prev.point))
-				draw.line(((output[-1])[0].x, (output[-1])[0].y, (output[-1])[1].x, (output[-1])[1].y), fill="red")
-				im.show()
 			else:
 				# edge event
-				log.debug("%.2f Edge event at intersection %s from <%s,%s>", i.distance, i.intersection_point, i.vertex_a, i.vertex_b)
+				log.info("%.2f Edge event at intersection %s from <%s,%s>", i.distance, i.intersection_point, i.vertex_a, i.vertex_b)
 				vertex = slav.unify(i.vertex_a, i.vertex_b, i.intersection_point)
 				output.append((i.intersection_point, i.vertex_a.point))
-				draw.line(((output[-1])[0].x, (output[-1])[0].y, (output[-1])[1].x, (output[-1])[1].y), fill="red")
 				output.append((i.intersection_point, i.vertex_b.point))
-				draw.line(((output[-1])[0].x, (output[-1])[0].y, (output[-1])[1].x, (output[-1])[1].y), fill="red")
-				im.show()
 				prioque.put(vertex.intersect_event())
 		elif isinstance(i, SplitEvent):
 			if not i.vertex.is_valid:
 				continue
 
-			log.debug("%.2f Split event at intersection %s from vertex %s, for edge %s", i.distance, i.intersection_point, i.vertex, i.opposite_edge)
+			log.info("%.2f Split event at intersection %s from vertex %s, for edge %s", i.distance, i.intersection_point, i.vertex, i.opposite_edge)
 			vertices = slav.split(i)
 			output.append((i.intersection_point, i.vertex.point))
-			draw.line((output[-1][0].x, output[-1][0].y, output[-1][1].x, output[-1][1].y), fill="red")
-			im.show()
 			for v in vertices:
 				prioque.put(v.intersect_event())
 	return output
 
 
 if __name__ == "__main__":
+	import Image, ImageDraw
 
-	log.basicConfig(level=log.DEBUG)
+	im = Image.new("RGB", (650, 650), "white");
+	draw = ImageDraw.Draw(im);
 
+	logging.basicConfig(level=logging.DEBUG)
 
 	poly = [
 		Point2(40,50),
