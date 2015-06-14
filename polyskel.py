@@ -40,6 +40,12 @@ def _cross(a, b):
 	res = a.x*b.y - b.x*a.y
 	return res
 
+def _approximately_equals(a, b):
+	return a==b or (abs(a-b) <= max(abs(a), abs(b)) * 0.001)
+
+def _approximately_same(point_a, point_b):
+	return _approximately_equals(point_a.x, point_b.x) and _approximately_equals(point_a.y, point_b.y)
+
 
 class _SplitEvent(namedtuple("_SplitEvent", "distance, intersection_point, vertex, opposite_edge")):
 	__slots__ = ()
@@ -50,6 +56,11 @@ class _EdgeEvent(namedtuple("_EdgeEvent", "distance intersection_point vertex_a 
 	__slots__ = ()
 	def __str__(self):
 		return "{} Edge event @ {} between {} and {}".format(self.distance, self.intersection_point, self.vertex_a, self.vertex_b)
+
+class _VertexEvent(namedtuple("_VertexEvent", "distance intersection_point vertices fallback_event")):
+	__slots__ = ()
+	def __str__(self):
+		return "{} Vertex event @ {} between {}".format(self.distance, self.intersection_point, ", ".join([str(v) for v in self.vertices]))
 
 _OriginalEdge = namedtuple("_OriginalEdge", "edge bisector_left, bisector_right")
 
@@ -95,7 +106,7 @@ class _LAVertex:
 				log.debug("\tconsidering EDGE %s", edge)
 				#intersect egde's line with the line of self's edge
 				i = Line2(self.edge_left).intersect(Line2(edge.edge))
-				if i is not None and i != self.point:
+				if i is not None and not _approximately_equals(i, self.point):
 					#locate candidate b
 					line = LineSegment2(i, self.point)
 					bisecvec = line.v.normalized() + edge.edge.v.normalized()
@@ -128,7 +139,28 @@ class _LAVertex:
 		if i_next is not None:
 			events.append(_EdgeEvent(Line2(self.edge_right).distance(i_next), i_next, self, self.next))
 
-		return None if not events else min(events, key=lambda event: event.distance)
+		if not events:
+			return None
+
+		ev = min(events, key=lambda event: event.distance)
+
+		if isinstance(ev, _EdgeEvent) and (ev.vertex_b.is_reflex or ev.vertex_a.is_reflex):
+			# vertex event possible
+			reflex_vertices = [v for v in (ev.vertex_a, ev.vertex_b) if v.is_reflex]
+
+			vertex = reflex_vertices[0].next
+			while vertex != reflex_vertices[0]:
+				if vertex.is_reflex and not (vertex == ev.vertex_a or vertex == ev.vertex_b):
+					i = self.bisector.intersect(vertex.bisector)
+					if i is not None and _approximately_same(i, ev.intersection_point) and _approximately_equals(Line2(vertex.edge_left).distance(i), ev.distance):
+						reflex_vertices.append(vertex)
+				vertex = vertex.next
+
+			if len(reflex_vertices)>=2:
+				ev = _VertexEvent(ev.distance, ev.intersection_point, reflex_vertices, ev)
+
+
+		return ev
 
 	def invalidate(self):
 		self._valid = False
@@ -189,9 +221,61 @@ class _SLAV:
 		event.vertex.invalidate()
 		return (output, events)
 
-	def split(self, event):
-		result = []
+	def handle_vertex_event(self, event):
+		log.info("%s", event)
 
+		new_vertices = []
+		output = []
+		vertices = list(event.vertices)
+
+		for i in range(1, len(vertices)):
+			vertex_a = event.vertices[i-1]
+			vertex_b = event.vertices[i]
+
+			if vertex_a.lav in self._lavs:
+				idx = self._lavs.index(vertex_a.lav)
+				del self._lavs[idx]
+
+			v1 = _LAVertex(event.intersection_point, vertex_a.edge_left, vertex_b.edge_right)
+			v2 = _LAVertex(event.intersection_point, vertex_b.edge_right, vertex_a.edge_left)
+
+			v1.prev = vertex_a.prev
+			v1.next = vertex_b.next
+			vertex_a.prev.next = v1
+			vertex_b.next.prev = v1
+
+			v2.prev = vertex_b.prev
+			v2.next = vertex_a.next
+			vertex_b.prev.next = v2
+			vertex_a.next.prev = v2
+
+			new_lavs = (_LAV.from_chain(v1, self), _LAV.from_chain(v2, self))
+			for new_lav in new_lavs:
+				if len(new_lav) > 2:
+					self._lavs.insert(idx, new_lav)
+					idx += 1
+					new_vertices.append(new_lav.head)
+				else:
+					output.append((new_lav.head.point, new_lav.head.next.point))
+					for v in new_lav:
+						v.invalidate()
+
+			vertices[i] = v2
+
+		events = []
+		for vertex in event.vertices:
+			print vertex.point
+			vertex.invalidate()
+			output.append((vertex.point, event.intersection_point))
+
+		for vertex in new_vertices:
+			next_event = vertex.next_event()
+			if next_event is not None:
+				events.append(next_event)
+
+		return (output, events)
+
+	def split(self, event):
 		x = None
 		for v in event.vertex.lav:
 			if v.has_edge(event.opposite_edge):
@@ -203,6 +287,7 @@ class _SLAV:
 		v2 = _LAVertex(event.intersection_point, x.edge_left, event.vertex.edge_right)
 
 		idx = self._lavs.index(event.vertex.lav)
+		del self._lavs[idx]
 
 		v1.prev = event.vertex.prev
 		v1.next = x
@@ -224,8 +309,6 @@ class _SLAV:
 			else:
 				for v in l:
 					v.invalidate()
-
-		del self._lavs[idx]
 
 		event.vertex.invalidate()
 		return res
@@ -342,15 +425,22 @@ def skeletonize(polygon):
 		i = prioque.get()
 		if isinstance(i, _EdgeEvent):
 			if not i.vertex_a.is_valid or not i.vertex_b.is_valid:
-				log.debug("%.2f Discarded outdated edge event %s", i.distance, i)
+				log.info("%.2f Discarded outdated edge event %s", i.distance, i)
 				continue
 
 			(arcs, events) = slav.handle_edge_event(i)
 		elif isinstance(i, _SplitEvent):
 			if not i.vertex.is_valid:
-				log.debug("%.2f Discarded outdated split event %s", i.distance, i)
+				log.info("%.2f Discarded outdated split event %s", i.distance, i)
 				continue
 			(arcs, events) = slav.handle_split_event(i)
+		elif isinstance(i, _VertexEvent):
+			valid_vertices = [v for v in i.vertices if v.is_valid]
+			if len(valid_vertices)>=2:
+				(arcs, events) = slav.handle_vertex_event(_VertexEvent(i.distance, i.intersection_point, valid_vertices, i.fallback_event))
+			else:
+				log.info("%.2f Vertex event outdated, falling back to edge event", i.distance)
+				(arcs, events) = slav.handle_edge_event(i.fallback_event)
 
 		prioque.put_all(events)
 		output.extend(arcs)
@@ -365,10 +455,10 @@ if __name__ == "__main__":
 	import Image, ImageDraw
 	im = Image.new("RGB", (650, 650), "white");
 	draw = ImageDraw.Draw(im);
-	debug = _Debug((im, draw))
+	#debug = _Debug((im, draw))
 
 
-	logging.basicConfig(level=logging.INFO)
+	logging.basicConfig(level=logging.WARN)
 
 
 	examples = {
@@ -420,7 +510,7 @@ if __name__ == "__main__":
 		]
 	}
 
-	poly = examples["iron cross"]
+	poly = examples["the sacred polygon"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
