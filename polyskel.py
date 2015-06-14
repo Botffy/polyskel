@@ -131,8 +131,8 @@ class _LAVertex:
 		return None if not events else min(events, key=lambda event: event.distance)
 
 	def invalidate(self):
-		self.lav = None
 		self._valid = False
+		self.lav = None
 
 	@property
 	def is_valid(self):
@@ -152,8 +152,42 @@ class _SLAV:
 		#store original polygon for calculating split events
 		self._polygon = [_OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector) for vertex in root]
 
-	def unify(self, vertex_a, vertex_b, point):
-		return vertex_a.lav.unify(vertex_a, vertex_b, point)
+
+	def handle_edge_event(self, event):
+		output = []
+		events = []
+
+		if len(event.vertex_a.lav) == 3:
+			log.info("%.2f Peak event at intersection %s from <%s,%s,%s>", event.distance, event.intersection_point, event.vertex_a, event.vertex_b, event.vertex_a.prev)
+			for vertex in event.vertex_a.lav:
+				output.append((vertex.point, event.intersection_point))
+				vertex.invalidate()
+		else:
+			log.info("%.2f Edge event at intersection %s from <%s,%s>", event.distance, event.intersection_point, event.vertex_a, event.vertex_b)
+			lav = event.vertex_a.lav
+			new_vertex = lav.unify(event.vertex_a, event.vertex_b, event.intersection_point)
+			for vertex in (event.vertex_a, event.vertex_b):
+				output.append((vertex.point, event.intersection_point))
+			next_event = new_vertex.next_event()
+			if next_event is not None:
+				events.append(next_event)
+
+		return (output, events)
+
+	def handle_split_event(self, event):
+		log.info("%.2f Split event at intersection %s from vertex %s, for edge %s", event.distance, event.intersection_point, event.vertex, event.opposite_edge)
+
+		output = [(event.vertex.point, event.intersection_point)]
+
+		vertices = self.split(event)
+		events = []
+		for vertex in vertices:
+			next_event = vertex.next_event()
+			if next_event is not None:
+				events.append(next_event)
+
+		event.vertex.invalidate()
+		return (output, events)
 
 	def split(self, event):
 		result = []
@@ -280,6 +314,10 @@ class _EventQueue:
 		if item is not None:
 			heapq.heappush(self.__data, item)
 
+	def put_all(self, iterable):
+		for item in iterable:
+			heapq.heappush(self.__data, item)
+
 	def get(self):
 		return heapq.heappop(self.__data)
 
@@ -302,39 +340,20 @@ def skeletonize(polygon):
 		i = prioque.get()
 		if isinstance(i, _EdgeEvent):
 			if not i.vertex_a.is_valid or not i.vertex_b.is_valid:
+				log.debug("%.2f Discarded outdated edge event %s", i.distance, i)
 				continue
 
-			if i.vertex_a.prev.prev == i.vertex_b:
-				# peak event
-				log.info("%.2f Peak event at intersection %s from <%s,%s,%s>", i.distance, i.intersection_point, i.vertex_a, i.vertex_b, i.vertex_a.prev)
-				i.vertex_a.invalidate()
-				i.vertex_b.invalidate()
-				i.vertex_a.prev.invalidate()
-				output.append((i.intersection_point, i.vertex_a.point))
-				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_a.point.x, i.vertex_a.point.y), fill="red")
-				output.append((i.intersection_point, i.vertex_b.point))
-				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_b.point.x, i.vertex_b.point.y), fill="red")
-				output.append((i.intersection_point, i.vertex_a.prev.point))
-				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_a.prev.point.x, i.vertex_a.prev.point.y), fill="red")
-			else:
-				# edge event
-				log.info("%.2f Edge event at intersection %s from <%s,%s>", i.distance, i.intersection_point, i.vertex_a, i.vertex_b)
-				vertex = slav.unify(i.vertex_a, i.vertex_b, i.intersection_point)
-				output.append((i.intersection_point, i.vertex_a.point))
-				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_a.point.x, i.vertex_a.point.y), fill="red")
-				output.append((i.intersection_point, i.vertex_b.point))
-				debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex_b.point.x, i.vertex_b.point.y), fill="red")
-				prioque.put(vertex.next_event())
+			(arcs, events) = slav.handle_edge_event(i)
 		elif isinstance(i, _SplitEvent):
 			if not i.vertex.is_valid:
+				log.debug("%.2f Discarded outdated split event %s", i.distance, i)
 				continue
+			(arcs, events) = slav.handle_split_event(i)
 
-			log.info("%.2f Split event at intersection %s from vertex %s, for edge %s", i.distance, i.intersection_point, i.vertex, i.opposite_edge)
-			vertices = slav.split(i)
-			output.append((i.intersection_point, i.vertex.point))
-			debug.line((i.intersection_point.x, i.intersection_point.y, i.vertex.point.x, i.vertex.point.y), fill="red")
-			for v in vertices:
-				prioque.put(v.next_event())
+		prioque.put_all(events)
+		output.extend(arcs)
+		for arc in arcs:
+			debug.line((arc[0].x, arc[0].y, arc[1].x, arc[1].y), fill="red")
 
 		debug.show()
 	return output
@@ -399,7 +418,7 @@ if __name__ == "__main__":
 		]
 	}
 
-	poly = examples["iron cross"]
+	poly = examples["the sacred polygon"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
