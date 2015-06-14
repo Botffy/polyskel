@@ -157,7 +157,7 @@ class _SLAV:
 		output = []
 		events = []
 
-		if len(event.vertex_a.lav) == 3:
+		if event.vertex_a.prev == event.vertex_b.next:
 			log.info("%.2f Peak event at intersection %s from <%s,%s,%s>", event.distance, event.intersection_point, event.vertex_a, event.vertex_b, event.vertex_a.prev)
 			for vertex in event.vertex_a.lav:
 				output.append((vertex.point, event.intersection_point))
@@ -285,6 +285,8 @@ class _LAV:
 
 		vertex_a.invalidate()
 		vertex_b.invalidate()
+
+		self._len -= 1
 		return replacement
 
 	def __len__(self):
@@ -363,7 +365,7 @@ if __name__ == "__main__":
 	import Image, ImageDraw
 	im = Image.new("RGB", (650, 650), "white");
 	draw = ImageDraw.Draw(im);
-	debug = _Debug(None)
+	debug = _Debug((im, draw))
 
 
 	logging.basicConfig(level=logging.INFO)
@@ -418,7 +420,7 @@ if __name__ == "__main__":
 		]
 	}
 
-	poly = examples["the sacred polygon"]
+	poly = examples["iron cross"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
