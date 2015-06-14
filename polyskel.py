@@ -460,7 +460,7 @@ if __name__ == "__main__":
 	#debug = _Debug((im, draw))
 
 
-	logging.basicConfig(level=logging.INFO)
+	logging.basicConfig(level=logging.WARN)
 
 
 	examples = {
@@ -500,7 +500,7 @@ if __name__ == "__main__":
 			Point2(520., 310.),
 			Point2(520., 40.)
 		],
-		"iron cross": [		# doesn't work
+		"iron cross 2/4": [		# degenerate polygon sporting a vertex event
 			Point2(100., 50),
 			Point2(150., 150.),
 			Point2(50., 100.),
@@ -509,10 +509,22 @@ if __name__ == "__main__":
 			Point2(350., 100.),
 			Point2(250., 150.),
 			Point2(300., 50)
+		],
+		"misshapen iron cross": [	# fails horribly due to cycles crashing into each other headlong. fixme
+			Point2(100., 50),
+			Point2(150., 150.),
+			Point2(50., 100.),
+			Point2(50., 250.),
+			Point2(150., 250.),
+			Point2(50., 350.),
+			Point2(350., 350.),
+			Point2(350., 100.),
+			Point2(250., 150.),
+			Point2(300., 50)
 		]
 	}
 
-	poly = examples["iron cross"]
+	poly = examples["the sacred polygon"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
