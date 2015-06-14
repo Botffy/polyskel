@@ -210,8 +210,44 @@ class _SLAV:
 		log.info("%.2f Split event at intersection %s from vertex %s, for edge %s", event.distance, event.intersection_point, event.vertex, event.opposite_edge)
 
 		output = [(event.vertex.point, event.intersection_point)]
+		vertices = []
+		x = None
+		for v in event.vertex.lav:
+			if v.has_edge(event.opposite_edge):
+				x = v
+				break
+		y = x.prev
 
-		vertices = self.split(event)
+		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, LineSegment2(x.edge_left.p, x.edge_left.v))
+		v2 = _LAVertex(event.intersection_point, x.edge_left, event.vertex.edge_right)
+
+		idx = self._lavs.index(event.vertex.lav)
+		del self._lavs[idx]
+
+		v1.prev = event.vertex.prev
+		v1.next = x
+		event.vertex.prev.next = v1
+		x.prev = v1
+
+		v2.prev = y
+		v2.next = event.vertex.next
+		event.vertex.next.prev = v2
+		y.next = v2
+
+		new_lavs = [_LAV.from_chain(v1, self), _LAV.from_chain(v2, self)]
+		for l in new_lavs:
+			if len(l) > 2:
+				self._lavs.insert(idx, l)
+				vertices.append(l.head)
+				idx += 1
+			else:
+				log.info("LAV has collapsed into the line {}--{}", l.head.point, l.head.next.point)
+				output.append((l.head.point, l.head.next.point))
+				for v in l:
+					v.invalidate()
+
+		event.vertex.invalidate()
+
 		events = []
 		for vertex in vertices:
 			next_event = vertex.next_event()
@@ -256,6 +292,7 @@ class _SLAV:
 					idx += 1
 					new_vertices.append(new_lav.head)
 				else:
+					log.info("LAV has collapsed into the line {}--{}", new_lav.head.point, new_lav.head.next.point)
 					output.append((new_lav.head.point, new_lav.head.next.point))
 					for v in new_lav:
 						v.invalidate()
@@ -276,41 +313,6 @@ class _SLAV:
 		return (output, events)
 
 	def split(self, event):
-		x = None
-		for v in event.vertex.lav:
-			if v.has_edge(event.opposite_edge):
-				x = v
-				break
-		y = x.prev
-
-		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, LineSegment2(x.edge_left.p, x.edge_left.v))
-		v2 = _LAVertex(event.intersection_point, x.edge_left, event.vertex.edge_right)
-
-		idx = self._lavs.index(event.vertex.lav)
-		del self._lavs[idx]
-
-		v1.prev = event.vertex.prev
-		v1.next = x
-		event.vertex.prev.next = v1
-		x.prev = v1
-
-		v2.prev = y
-		v2.next = event.vertex.next
-		event.vertex.next.prev = v2
-		y.next = v2
-
-		res = []
-		new_lavs = [_LAV.from_chain(v1, self), _LAV.from_chain(v2, self)]
-		for l in new_lavs:
-			if len(l) > 2:
-				self._lavs.insert(idx, l)
-				res.append(l.head)
-				idx += 1
-			else:
-				for v in l:
-					v.invalidate()
-
-		event.vertex.invalidate()
 		return res
 
 	@property
@@ -458,7 +460,7 @@ if __name__ == "__main__":
 	#debug = _Debug((im, draw))
 
 
-	logging.basicConfig(level=logging.WARN)
+	logging.basicConfig(level=logging.INFO)
 
 
 	examples = {
@@ -510,7 +512,7 @@ if __name__ == "__main__":
 		]
 	}
 
-	poly = examples["the sacred polygon"]
+	poly = examples["iron cross"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point.x, point.y, next.x, next.y), fill=0)
 
