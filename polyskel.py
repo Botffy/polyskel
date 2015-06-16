@@ -178,6 +178,9 @@ class _LAVertex:
 
 class _SLAV:
 	def __init__(self, polygon):
+		if not isinstance(polygon[0], Point2):
+			polygon = [Point2(float(x), float(y)) for (x,y) in polygon]
+
 		root = _LAV.from_polygon(polygon, self)
 		self._lavs = [root]
 
@@ -465,68 +468,68 @@ if __name__ == "__main__":
 
 	examples = {
 		'the sacred polygon': [
-			Point2(40,50),
-			Point2(40, 520),
-			Point2(625,425),
-			Point2(500,325),
-			Point2(635,250),
-			Point2(635,10),
-			Point2(250,40),
-			Point2(200,200),
-			Point2(100,50)
+			(40,50),
+			(40, 520),
+			(625,425),
+			(500,325),
+			(635,250),
+			(635,10),
+			(250,40),
+			(200,200),
+			(100,50)
 		],
 		'simple': [
-			Point2(30., 20.),
-			Point2(30., 120.),
-			Point2(90., 70.), #170
-			Point2(160., 140.),
-			Point2(178., 93.),
-			Point2(160., 20.),
+			(30, 20),
+			(30, 120),
+			(90, 70), #170
+			(160, 140),
+			(178, 93),
+			(160, 20),
 		],
 		"multiply split": [
-			Point2(40., 60.),
-			Point2(100., 310.),
-			Point2(180., 180.),
-			Point2(260., 310.),
-			Point2(340., 150.),
-			Point2(420., 310.),
-			Point2(500., 180.),
-			Point2(580., 310.),
-			Point2(640., 60.)
+			(40, 60),
+			(100, 310),
+			(180, 180),
+			(260, 310),
+			(340, 150),
+			(420, 310),
+			(500, 180),
+			(580, 310),
+			(640, 60)
 		],
 		'rectangle': [
-			Point2(40., 40.),
-			Point2(40., 310.),
-			Point2(520., 310.),
-			Point2(520., 40.)
+			(40, 40),
+			(40, 310),
+			(520, 310),
+			(520, 40)
 		],
 		"iron cross 2/4": [		# degenerate polygon sporting a vertex event
-			Point2(100., 50),
-			Point2(150., 150.),
-			Point2(50., 100.),
-			Point2(50., 350.),
-			Point2(350., 350.),
-			Point2(350., 100.),
-			Point2(250., 150.),
-			Point2(300., 50)
+			(100, 50),
+			(150, 150),
+			(50, 100),
+			(50, 350),
+			(350, 350),
+			(350, 100),
+			(250, 150),
+			(300, 50)
 		],
 		"misshapen iron cross": [	# fails horribly due to cycles crashing into each other headlong. fixme
-			Point2(100., 50),
-			Point2(150., 150.),
-			Point2(50., 100.),
-			Point2(50., 250.),
-			Point2(150., 250.),
-			Point2(50., 350.),
-			Point2(350., 350.),
-			Point2(350., 100.),
-			Point2(250., 150.),
-			Point2(300., 50)
+			(100, 50),
+			(150, 150),
+			(50, 100),
+			(50, 250),
+			(150, 250),
+			(50, 350),
+			(350, 350),
+			(350, 100),
+			(250, 150),
+			(300, 50)
 		]
 	}
 
 	poly = examples["the sacred polygon"]
 	for point, next in zip(poly, poly[1:]+poly[:1]):
-		draw.line((point.x, point.y, next.x, next.y), fill=0)
+		draw.line((point[0], point[1], next[0], next[1]), fill=0)
 
 	skeleton = skeletonize(poly)
 	for res in skeleton:
