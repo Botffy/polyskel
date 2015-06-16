@@ -219,6 +219,7 @@ class _SLAV:
 			if v.has_edge(event.opposite_edge):
 				x = v
 				break
+		if x is None: return ([], []) #fugly hack
 		y = x.prev
 
 		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, LineSegment2(x.edge_left.p, x.edge_left.v))
@@ -451,8 +452,8 @@ def skeletonize(polygon):
 			if len(valid_vertices)>=2:
 				(arcs, events) = slav.handle_vertex_event(_VertexEvent(i.distance, i.intersection_point, valid_vertices, i.fallback_event))
 			else:
-				log.info("%.2f Vertex event outdated, falling back to edge event", i.distance)
-				(arcs, events) = slav.handle_edge_event(i.fallback_event)
+				prioque.put(i.fallback_event)
+				continue
 
 		prioque.put_all(events)
 		output.extend(arcs)
