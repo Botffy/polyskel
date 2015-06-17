@@ -245,7 +245,7 @@ class _SLAV:
 				vertices.append(l.head)
 				idx += 1
 			else:
-				log.info("LAV has collapsed into the line {}--{}", l.head.point, l.head.next.point)
+				log.info("LAV has collapsed into the line %s--%s", l.head.point, l.head.next.point)
 				output.append((l.head.point, l.head.next.point))
 				for v in l:
 					v.invalidate()
@@ -296,7 +296,7 @@ class _SLAV:
 					idx += 1
 					new_vertices.append(new_lav.head)
 				else:
-					log.info("LAV has collapsed into the line {}--{}", new_lav.head.point, new_lav.head.next.point)
+					log.info("LAV has collapsed into the line %s--%s", new_lav.head.point, new_lav.head.next.point)
 					output.append((new_lav.head.point, new_lav.head.next.point))
 					for v in new_lav:
 						v.invalidate()
