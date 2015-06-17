@@ -6,7 +6,7 @@ from collections import namedtuple
 
 log = logging.getLogger(__name__)
 
-class _Debug:
+class Debug:
 	def __init__(self, image):
 		if image is not None:
 			self.im = image[0]
@@ -27,8 +27,11 @@ class _Debug:
 		if self.do:
 			self.im.show()
 
+_debug = Debug(None)
 
-debug = _Debug(None)
+def set_debug(image):
+	global _debug
+	_debug = Debug(image)
 
 def _window(lst):
 	prevs, items, nexts = tee(lst, 3)
@@ -84,7 +87,7 @@ class _LAVertex:
 		self._is_reflex = (_cross(*creator_vectors)) < 0
 		self._bisector = Ray2(self.point, operator.add(*creator_vectors) * (-1 if self.is_reflex else 1))
 		log.info("Created vertex %s", self.__repr__())
-		debug.line((self.bisector.p.x, self.bisector.p.y, self.bisector.p.x+self.bisector.v.x*100, self.bisector.p.y+self.bisector.v.y*100), fill="blue")
+		_debug.line((self.bisector.p.x, self.bisector.p.y, self.bisector.p.x+self.bisector.v.x*100, self.bisector.p.y+self.bisector.v.y*100), fill="blue")
 
 	@property
 	def bisector(self):
@@ -458,9 +461,9 @@ def skeletonize(polygon):
 		prioque.put_all(events)
 		output.extend(arcs)
 		for arc in arcs:
-			debug.line((arc[0].x, arc[0].y, arc[1].x, arc[1].y), fill="red")
+			_debug.line((arc[0].x, arc[0].y, arc[1].x, arc[1].y), fill="red")
 
-		debug.show()
+		_debug.show()
 	return output
 
 
@@ -468,7 +471,7 @@ if __name__ == "__main__":
 	import Image, ImageDraw
 	im = Image.new("RGB", (650, 650), "white");
 	draw = ImageDraw.Draw(im);
-	#debug = _Debug((im, draw))
+	#set_debug((im, draw))
 
 
 	logging.basicConfig(level=logging.WARN)
