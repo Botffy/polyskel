@@ -72,7 +72,7 @@ def _side(point, line):
 	b = line.p.y
 
 class _LAVertex:
-	def __init__(self, point, edge_left, edge_right, creator_vectors=None):
+	def __init__(self, point, edge_left, edge_right, direction_vectors=None):
 		self.point = point
 		self.edge_left = edge_left
 		self.edge_right = edge_right
@@ -81,10 +81,11 @@ class _LAVertex:
 		self.lav = None
 		self._valid = True; # this should be handled better. Maybe membership in lav implies validity?
 
-		if creator_vectors is None:
-			creator_vectors = (edge_left.v.normalized()*-1, edge_right.v.normalized())
+		creator_vectors = (edge_left.v.normalized()*-1, edge_right.v.normalized())
+		if direction_vectors is None:
+			direction_vectors = creator_vectors
 
-		self._is_reflex = (_cross(*creator_vectors)) < 0
+		self._is_reflex = (_cross(*direction_vectors)) < 0
 		self._bisector = Ray2(self.point, operator.add(*creator_vectors) * (-1 if self.is_reflex else 1))
 		log.info("Created vertex %s", self.__repr__())
 		_debug.line((self.bisector.p.x, self.bisector.p.y, self.bisector.p.x+self.bisector.v.x*100, self.bisector.p.y+self.bisector.v.y*100), fill="blue")
@@ -407,7 +408,7 @@ class _LAV:
 		return self._slav.original_polygon
 
 	def unify(self, vertex_a, vertex_b, point):
-		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right, (vertex_b.bisector.v, vertex_a.bisector.v))
+		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right, (vertex_b.bisector.v.normalized(), vertex_a.bisector.v.normalized()))
 		replacement.lav = self
 
 		if self.head in [vertex_a, vertex_b]:
