@@ -97,13 +97,9 @@ class _LAVertex:
 	def is_reflex(self):
 		return self._is_reflex
 
-	def has_edge(self, edge):
-		return edge.v.normalized() == self.edge_left.v.normalized() and edge.p == self.edge_left.p
-
 	def next_event(self):
 		events = []
 		if self.is_reflex:
-			candidates = []
 			log.debug("looking for split candidates for vertex %s", self)
 			for edge in self.lav.original_polygon:
 				log.debug("\tconsidering EDGE %s", edge)
@@ -121,18 +117,16 @@ class _LAVertex:
 						continue
 
 					#check eligibility of b
-					xleft = _cross(edge.bisector_left.v.normalized(), LineSegment2(edge.bisector_left.p, b).v.normalized())  > 0
+					xleft =  _cross(edge.bisector_left.v.normalized(), LineSegment2(edge.bisector_left.p, b).v.normalized())  > 0
 					xright = _cross(edge.bisector_right.v.normalized(), LineSegment2(edge.bisector_right.p, b).v.normalized())  <  0
-					xedge = _cross(edge.edge.v.normalized(), LineSegment2(edge.edge.p, b).v.normalized()) < 0
+					xedge =  _cross(edge.edge.v.normalized(), LineSegment2(edge.edge.p, b).v.normalized()) < 0
 
 					if not (xleft and xright and xedge):
 						log.debug("\t\tDiscarded candidate %s (%s-%s-%s)", b, xleft, xright, xedge)
 						continue
 
 					log.debug("\t\tFound valid candidate %s", b)
-					candidates.append( _SplitEvent(Line2(edge.edge).distance(b), b, self, edge.edge) )
-			if candidates:
-				events.append( min(candidates, key=lambda event: self.point.distance(event.intersection_point)) )
+					events.append( _SplitEvent(Line2(edge.edge).distance(b), b, self, edge.edge) )
 
 		i_prev = self.bisector.intersect(self.prev.bisector)
 		i_next = self.bisector.intersect(self.next.bisector)
@@ -145,7 +139,7 @@ class _LAVertex:
 		if not events:
 			return None
 
-		ev = min(events, key=lambda event: event.distance)
+		ev = min(events, key=lambda event: self.point.distance(event.intersection_point))
 
 		if isinstance(ev, _EdgeEvent) and (ev.vertex_b.is_reflex or ev.vertex_a.is_reflex):
 			# vertex event possible
@@ -163,6 +157,7 @@ class _LAVertex:
 				ev = _VertexEvent(ev.distance, ev.intersection_point, reflex_vertices, ev)
 
 
+		log.info("Generated new event for %s: %s", self, ev)
 		return ev
 
 	def invalidate(self):
@@ -218,15 +213,48 @@ class _SLAV:
 		output = [(event.vertex.point, event.intersection_point)]
 		vertices = []
 		x = None
+		y = None
+		v1 = None
+		v2 = None
+		norm = event.opposite_edge.v.normalized()
 		for v in event.vertex.lav:
-			if v.has_edge(event.opposite_edge):
-				x = v
-				break
-		if x is None: return ([], []) #fugly hack
-		y = x.prev
+			xv1 = None
+			xv2 = None
+			if norm == v.edge_left.v.normalized() and event.opposite_edge.p == v.edge_left.p:
+				xv1 =  _cross(v.bisector.v.normalized()     , LineSegment2(v.point     , event.intersection_point).v.normalized()) < 0
+				xv2 =  _cross(v.prev.bisector.v.normalized(), LineSegment2(v.prev.point, event.intersection_point).v.normalized()) > 0
 
-		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, LineSegment2(x.edge_left.p, x.edge_left.v))
-		v2 = _LAVertex(event.intersection_point, x.edge_left, event.vertex.edge_right)
+				log.info("Vertex %s holds edge as left edge (%s, %s)", v, xv1, xv2)
+				#if not xv1 or not xv2:
+				#	continue
+
+				x = v
+				y = x.prev
+				break
+			elif norm == v.edge_right.v.normalized() and event.opposite_edge.p == v.edge_right.p:
+			#	xv1 =  _cross(v.bisector.v.normalized()     , LineSegment2(v.point     , event.intersection_point).v.normalized()) < 0
+			#	xv2 =  _cross(v.next.bisector.v.normalized(), LineSegment2(v.next.point, event.intersection_point).v.normalized()) > 0
+
+				log.info("Vertex %s holds edge as right edge (%s, %s)", v, xv1, xv2)
+				#if not xv1 or not xv2:
+				#	continue
+
+				y=v
+				x=y.next
+				break
+
+		if x is None:
+			print "Now."
+			log.warn("FAILED split event %s", event)
+			return ([], []) #fugly hack
+
+		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, event.opposite_edge)
+		v2 = _LAVertex(event.intersection_point, event.opposite_edge, event.vertex.edge_right)
+
+		print event.distance
+		if v1.is_reflex or v2.is_reflex:
+			print "OHMYGOD"
+			_debug.show()
 
 		idx = self._lavs.index(event.vertex.lav)
 		del self._lavs[idx]
@@ -252,8 +280,6 @@ class _SLAV:
 				output.append((l.head.point, l.head.next.point))
 				for v in l:
 					v.invalidate()
-
-		event.vertex.invalidate()
 
 		events = []
 		for vertex in vertices:
@@ -402,7 +428,7 @@ class _LAV:
 	def _show(self):
 		cur = self.head
 		while True:
-			print cur
+			print cur.__repr__()
 			cur = cur.next
 			if cur == self.head:
 				break
@@ -428,6 +454,9 @@ class _EventQueue:
 	def peek(self):
 		return self.__data[0]
 
+	def show(self):
+		for item in self.__data:
+			print item
 
 def skeletonize(polygon):
 	slav = _SLAV(polygon)
@@ -462,7 +491,6 @@ def skeletonize(polygon):
 		output.extend(arcs)
 		for arc in arcs:
 			_debug.line((arc[0].x, arc[0].y, arc[1].x, arc[1].y), fill="red")
-
 		_debug.show()
 	return output
 
@@ -471,10 +499,10 @@ if __name__ == "__main__":
 	import Image, ImageDraw
 	im = Image.new("RGB", (650, 650), "white");
 	draw = ImageDraw.Draw(im);
-	#set_debug((im, draw))
+	set_debug((im, draw))
 
 
-	logging.basicConfig(level=logging.WARN)
+	logging.basicConfig(level=logging.DEBUG)
 
 
 	examples = {
