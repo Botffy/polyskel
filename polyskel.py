@@ -102,24 +102,40 @@ class _LAVertex:
 		if self.is_reflex:
 			log.debug("looking for split candidates for vertex %s", self)
 			for edge in self.lav.original_polygon:
+				if edge.edge == self.edge_left or edge.edge == self.edge_right:
+					continue
+
 				log.debug("\tconsidering EDGE %s", edge)
+
+				# choose the "less parallel" edge (in order to exclude a potentially parallel edge)
+				leftdot = abs(self.edge_left.v.normalized().dot(edge.edge.v.normalized()))
+				rightdot = abs(self.edge_right.v.normalized().dot(edge.edge.v.normalized()))
+				selfedge = self.edge_left if leftdot < rightdot else self.edge_right
+				otheredge = self.edge_left if leftdot > rightdot else self.edge_right
+				#selfedge = self.edge_left
+
 				#intersect egde's line with the line of self's edge
-				i = Line2(self.edge_left).intersect(Line2(edge.edge))
+				i = Line2(selfedge).intersect(Line2(edge.edge))
 				if i is not None and not _approximately_equals(i, self.point):
 					#locate candidate b
-					line = LineSegment2(i, self.point)
-					bisecvec = line.v.normalized() + edge.edge.v.normalized()
+					linvec = (self.point - i).normalized()
+					edvec = edge.edge.v.normalized()
+					if linvec.dot(edvec)<0:
+						edvec = -edvec
+
+					bisecvec = edvec + linvec
 					if abs(bisecvec) == 0:
 						continue
 					bisector = Line2(i, bisecvec)
 					b = bisector.intersect(self.bisector)
+
 					if b is None:
 						continue
 
 					#check eligibility of b
-					xleft =  _cross(edge.bisector_left.v.normalized(), LineSegment2(edge.bisector_left.p, b).v.normalized())  > 0
-					xright = _cross(edge.bisector_right.v.normalized(), LineSegment2(edge.bisector_right.p, b).v.normalized())  <  0
-					xedge =  _cross(edge.edge.v.normalized(), LineSegment2(edge.edge.p, b).v.normalized()) < 0
+					xleft =  _cross(edge.bisector_left.v.normalized(), (b - edge.bisector_left.p).normalized())  > 0
+					xright = _cross(edge.bisector_right.v.normalized(), (b - edge.bisector_right.p).normalized())  <  0
+					xedge =  _cross(edge.edge.v.normalized(), (b - edge.edge.p).normalized()) < 0
 
 					if not (xleft and xright and xedge):
 						log.debug("\t\tDiscarded candidate %s (%s-%s-%s)", b, xleft, xright, xedge)
@@ -244,17 +260,11 @@ class _SLAV:
 				break
 
 		if x is None:
-			print "Now."
-			log.warn("FAILED split event %s", event)
-			return ([], []) #fugly hack
+			log.error("FAILED split event %s", event)
+			return ([], [])
 
 		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, event.opposite_edge)
 		v2 = _LAVertex(event.intersection_point, event.opposite_edge, event.vertex.edge_right)
-
-		print event.distance
-		if v1.is_reflex or v2.is_reflex:
-			print "OHMYGOD"
-			_debug.show()
 
 		idx = self._lavs.index(event.vertex.lav)
 		del self._lavs[idx]
@@ -491,6 +501,7 @@ def skeletonize(polygon):
 		output.extend(arcs)
 		for arc in arcs:
 			_debug.line((arc[0].x, arc[0].y, arc[1].x, arc[1].y), fill="red")
+
 		_debug.show()
 	return output
 
@@ -552,7 +563,7 @@ if __name__ == "__main__":
 			(250, 150),
 			(300, 50)
 		],
-		"misshapen iron cross": [	# fails horribly due to cycles crashing into each other headlong. fixme
+		"misshapen iron cross": [
 			(100, 50),
 			(150, 150),
 			(50, 100),
