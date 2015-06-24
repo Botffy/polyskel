@@ -373,14 +373,10 @@ class _LAV:
 	@classmethod
 	def from_polygon(cls, polygon, slav):
 		lav = cls(slav)
+
+		polygon = [point for prev, point, next in _window(polygon) if not (point==next or (point-prev).normalized() == (next-point).normalized())]
+
 		for prev, point, next in _window(polygon):
-			if point==prev or point==next:
-				continue
-
-			if (point-prev).normalized() == (next-point).normalized():
-				log.debug("Skipping colinear point %s", point)
-				continue
-
 			lav._len += 1
 			vertex = _LAVertex(point, LineSegment2(prev, point), LineSegment2(point, next))
 			vertex.lav = lav
