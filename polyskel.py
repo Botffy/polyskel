@@ -4,7 +4,7 @@ from euclid import *
 from itertools import cycle, chain, islice, izip, tee
 from collections import namedtuple
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("__name__")
 
 class Debug:
 	def __init__(self, image):
@@ -502,86 +502,3 @@ def skeletonize(polygon):
 		_debug.show()
 	return output
 
-
-if __name__ == "__main__":
-	import Image, ImageDraw
-	im = Image.new("RGB", (650, 650), "white");
-	draw = ImageDraw.Draw(im);
-	set_debug((im, draw))
-
-
-	logging.basicConfig(level=logging.DEBUG)
-
-
-	examples = {
-		'the sacred polygon': [
-			(40,50),
-			(40, 520),
-			(625,425),
-			(500,325),
-			(635,250),
-			(635,10),
-			(250,40),
-			(200,200),
-			(100,50)
-		],
-		'simple': [
-			(30, 20),
-			(30, 120),
-			(90, 70), #170
-			(160, 140),
-			(178, 93),
-			(160, 20),
-		],
-		"multiply split": [
-			(40, 60),
-			(100, 310),
-			(180, 180),
-			(260, 310),
-			(340, 150),
-			(420, 310),
-			(500, 180),
-			(580, 310),
-			(640, 60)
-		],
-		'rectangle': [
-			(40, 40),
-			(40, 310),
-			(520, 310),
-			(520, 40)
-		],
-		"iron cross 2/4": [		# degenerate polygon sporting a vertex event
-			(100, 50),
-			(150, 150),
-			(50, 100),
-			(50, 350),
-			(350, 350),
-			(350, 100),
-			(250, 150),
-			(300, 50)
-		],
-		"misshapen iron cross": [
-			(100, 50),
-			(150, 150),
-			(50, 100),
-			(50, 250),
-			(150, 250),
-			(50, 350),
-			(350, 350),
-			(350, 100),
-			(250, 150),
-			(300, 50)
-		]
-	}
-
-	poly = examples["the sacred polygon"]
-	for point, next in zip(poly, poly[1:]+poly[:1]):
-		draw.line((point[0], point[1], next[0], next[1]), fill=0)
-
-	skeleton = skeletonize(poly)
-	for res in skeleton:
-		print res
-
-	for line in skeleton:
-		draw.line((line[0].x, line[0].y, line[1].x, line[1].y), fill="red")
-	im.show();
