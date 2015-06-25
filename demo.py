@@ -9,14 +9,16 @@ if __name__ == "__main__":
 
 	argparser = argparse.ArgumentParser()
 	argparser.add_argument('polygon_file', metavar="<polygon-file>", type=argparse.FileType('r'), help="text file describing the polygon ('-' for standard input)")
+	argparser.add_argument('--verbose', '--v', action="store_true", default=False, help="Show construction of the skeleton")
 	args = argparser.parse_args()
 
 	im = Image.new("RGB", (650, 650), "white");
 	draw = ImageDraw.Draw(im);
-	polyskel.set_debug((im, draw))
+	if args.verbose:
+		polyskel.set_debug((im, draw))
 	polyskel.log.setLevel(logging.WARN)
 
-	polygon_line_pat = re.compile(r"\s*(?P<coord_x>\d+(\.\d+)?)\s*,\s*(?P<coord_y>\d+(\.\d+)?)\s*#?.*")
+	polygon_line_pat = re.compile(r"\s*(?P<coord_x>\d+(\.\d+)?)\s*,\s*(?P<coord_y>\d+(\.\d+)?)\s*(#.*)?")
 
 	poly = []
 	for line in args.polygon_file:
