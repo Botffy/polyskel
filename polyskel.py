@@ -217,24 +217,13 @@ class _SLAV:
 			xv1 = None
 			xv2 = None
 			if norm == v.edge_left.v.normalized() and event.opposite_edge.p == v.edge_left.p:
-				xv1 =  _cross(v.bisector.v.normalized()     , LineSegment2(v.point     , event.intersection_point).v.normalized()) < 0
-				xv2 =  _cross(v.prev.bisector.v.normalized(), LineSegment2(v.prev.point, event.intersection_point).v.normalized()) > 0
-
+				# if adding hole handling, don't forget boundchecking
 				log.info("Vertex %s holds edge as left edge (%s, %s)", v, xv1, xv2)
-				#if not xv1 or not xv2:
-				#	continue
-
 				x = v
 				y = x.prev
 				break
 			elif norm == v.edge_right.v.normalized() and event.opposite_edge.p == v.edge_right.p:
-			#	xv1 =  _cross(v.bisector.v.normalized()     , LineSegment2(v.point     , event.intersection_point).v.normalized()) < 0
-			#	xv2 =  _cross(v.next.bisector.v.normalized(), LineSegment2(v.next.point, event.intersection_point).v.normalized()) > 0
-
 				log.info("Vertex %s holds edge as right edge (%s, %s)", v, xv1, xv2)
-				#if not xv1 or not xv2:
-				#	continue
-
 				y=v
 				x=y.next
 				break
@@ -279,9 +268,6 @@ class _SLAV:
 
 		event.vertex.invalidate()
 		return (output, events)
-
-	def split(self, event):
-		return res
 
 	@property
 	def original_polygon(self):
