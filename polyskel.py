@@ -60,11 +60,6 @@ class _EdgeEvent(namedtuple("_EdgeEvent", "distance intersection_point vertex_a 
 	def __str__(self):
 		return "{} Edge event @ {} between {} and {}".format(self.distance, self.intersection_point, self.vertex_a, self.vertex_b)
 
-class _VertexEvent(namedtuple("_VertexEvent", "distance intersection_point vertices fallback_event")):
-	__slots__ = ()
-	def __str__(self):
-		return "{} Vertex event @ {} between {}".format(self.distance, self.intersection_point, ", ".join([str(v) for v in self.vertices]))
-
 _OriginalEdge = namedtuple("_OriginalEdge", "edge bisector_left, bisector_right")
 
 def _side(point, line):
@@ -157,22 +152,6 @@ class _LAVertex:
 			return None
 
 		ev = min(events, key=lambda event: self.point.distance(event.intersection_point))
-
-		if isinstance(ev, _EdgeEvent) and (ev.vertex_b.is_reflex or ev.vertex_a.is_reflex):
-			# vertex event possible
-			reflex_vertices = [v for v in (ev.vertex_a, ev.vertex_b) if v.is_reflex]
-
-			vertex = reflex_vertices[0].next
-			while vertex != reflex_vertices[0]:
-				if vertex.is_reflex and not (vertex == ev.vertex_a or vertex == ev.vertex_b):
-					i = self.bisector.intersect(vertex.bisector)
-					if i is not None and _approximately_same(i, ev.intersection_point) and _approximately_equals(Line2(vertex.edge_left).distance(i), ev.distance):
-						reflex_vertices.append(vertex)
-				vertex = vertex.next
-
-			if len(reflex_vertices)>=2:
-				ev = _VertexEvent(ev.distance, ev.intersection_point, reflex_vertices, ev)
-
 
 		log.info("Generated new event for %s: %s", self, ev)
 		return ev
@@ -299,61 +278,6 @@ class _SLAV:
 				events.append(next_event)
 
 		event.vertex.invalidate()
-		return (output, events)
-
-	def handle_vertex_event(self, event):
-		log.info("%s", event)
-
-		new_vertices = []
-		output = []
-		vertices = list(event.vertices)
-
-		for i in range(1, len(vertices)):
-			vertex_a = event.vertices[i-1]
-			vertex_b = event.vertices[i]
-
-			if vertex_a.lav in self._lavs:
-				idx = self._lavs.index(vertex_a.lav)
-				del self._lavs[idx]
-
-			v1 = _LAVertex(event.intersection_point, vertex_a.edge_left, vertex_b.edge_right)
-			v2 = _LAVertex(event.intersection_point, vertex_b.edge_right, vertex_a.edge_left)
-
-			v1.prev = vertex_a.prev
-			v1.next = vertex_b.next
-			vertex_a.prev.next = v1
-			vertex_b.next.prev = v1
-
-			v2.prev = vertex_b.prev
-			v2.next = vertex_a.next
-			vertex_b.prev.next = v2
-			vertex_a.next.prev = v2
-
-			new_lavs = (_LAV.from_chain(v1, self), _LAV.from_chain(v2, self))
-			for new_lav in new_lavs:
-				if len(new_lav) > 2:
-					self._lavs.insert(idx, new_lav)
-					idx += 1
-					new_vertices.append(new_lav.head)
-				else:
-					log.info("LAV has collapsed into the line %s--%s", new_lav.head.point, new_lav.head.next.point)
-					output.append((new_lav.head.point, new_lav.head.next.point))
-					for v in new_lav:
-						v.invalidate()
-
-			vertices[i] = v2
-
-		events = []
-		for vertex in event.vertices:
-			print vertex.point
-			vertex.invalidate()
-			output.append((vertex.point, event.intersection_point))
-
-		for vertex in new_vertices:
-			next_event = vertex.next_event()
-			if next_event is not None:
-				events.append(next_event)
-
 		return (output, events)
 
 	def split(self, event):
@@ -486,13 +410,6 @@ def skeletonize(polygon):
 				log.info("%.2f Discarded outdated split event %s", i.distance, i)
 				continue
 			(arcs, events) = slav.handle_split_event(i)
-		elif isinstance(i, _VertexEvent):
-			valid_vertices = [v for v in i.vertices if v.is_valid]
-			if len(valid_vertices)>=2:
-				(arcs, events) = slav.handle_vertex_event(_VertexEvent(i.distance, i.intersection_point, valid_vertices, i.fallback_event))
-			else:
-				prioque.put(i.fallback_event)
-				continue
 
 		prioque.put_all(events)
 		output.extend(arcs)
