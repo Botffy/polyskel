@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw
 if __name__ == "__main__":
 	logging.basicConfig()
 
-	argparser = argparse.ArgumentParser()
+	argparser = argparse.ArgumentParser(description="Construct the straight skeleton of a polygon. The polygon is to be given as a counter-clockwise series of vertices specified by their coordinates: see the example files for the exact format.")
 	argparser.add_argument('polygon_file', metavar="<polygon-file>", type=argparse.FileType('r'), help="text file describing the polygon ('-' for standard input)")
 	argparser.add_argument('--verbose', '--v', action="store_true", default=False, help="Show construction of the skeleton")
 	argparser.add_argument('--log', dest="loglevel", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], default='WARNING', help="Set log level")
