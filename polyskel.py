@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+
+"""
+Implementation of the straight skeleton algorithm as described by Felkel and Obdržálek in their 1998 conference paper Straight skeleton implementation (sans holes)
+"""
+
 import logging
 import heapq
 from euclid import *
@@ -377,6 +383,13 @@ class _EventQueue:
 			print item
 
 def skeletonize(polygon):
+	"""
+	Compute the straight skeleton of a polygon.
+
+	The polygon should be given as a list of vertices in counter-clockwise order.
+
+	Returns the straight skeleton as a list of edges.
+	"""
 	slav = _SLAV(polygon)
 	output = []
 	prioque = _EventQueue()
