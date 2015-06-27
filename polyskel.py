@@ -188,6 +188,7 @@ class _SLAV:
 
 		if event.vertex_a.prev == event.vertex_b.next:
 			log.info("%.2f Peak event at intersection %s from <%s,%s,%s>", event.distance, event.intersection_point, event.vertex_a, event.vertex_b, event.vertex_a.prev)
+			self._lavs.remove(event.vertex_a.lav)
 			for vertex in event.vertex_a.lav:
 				output.append((vertex.point, event.intersection_point))
 				vertex.invalidate()
