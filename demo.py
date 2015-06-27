@@ -13,12 +13,7 @@ if __name__ == "__main__":
 	argparser.add_argument('--log', dest="loglevel", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], default='WARNING', help="Set log level")
 	args = argparser.parse_args()
 
-	im = Image.new("RGB", (650, 650), "white");
-	draw = ImageDraw.Draw(im);
-	if args.verbose:
-		polyskel.set_debug((im, draw))
 	polyskel.log.setLevel(getattr(logging, args.loglevel))
-
 	polygon_line_pat = re.compile(r"\s*(?P<coord_x>\d+(\.\d+)?)\s*,\s*(?P<coord_y>\d+(\.\d+)?)\s*(#.*)?")
 
 	poly = []
@@ -30,9 +25,17 @@ if __name__ == "__main__":
 		match = polygon_line_pat.match(line)
 		poly.append((float(match.group("coord_x")), float(match.group("coord_y"))))
 
+	bbox_end_x = int(max(poly, key=lambda x: x[0])[0]+20)
+	bbox_end_y = int(max(poly, key=lambda x: x[1])[1]+20)
+
+	im = Image.new("RGB", (bbox_end_x, bbox_end_y), "white");
+	draw = ImageDraw.Draw(im);
+	if args.verbose:
+		polyskel.set_debug((im, draw))
+
+
 	if not args.polygon_file.isatty():
 		args.polygon_file.close()
-
 
 	for point, next in zip(poly, poly[1:]+poly[:1]):
 		draw.line((point[0], point[1], next[0], next[1]), fill=0)
