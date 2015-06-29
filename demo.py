@@ -55,6 +55,7 @@ if __name__ == "__main__":
 	for res in skeleton:
 		print res
 
-	for line in skeleton:
-		draw.line((line[0].x, line[0].y, line[1].x, line[1].y), fill="red")
+	for arc in skeleton:
+		for sink in arc.sinks:
+			draw.line((arc.source.x, arc.source.y, sink.x, sink.y), fill="red")
 	im.show();

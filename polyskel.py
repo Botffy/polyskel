@@ -72,6 +72,8 @@ class _EdgeEvent(namedtuple("_EdgeEvent", "distance intersection_point vertex_a 
 
 _OriginalEdge = namedtuple("_OriginalEdge", "edge bisector_left, bisector_right")
 
+Subtree = namedtuple("Subtree", "source, height, sinks")
+
 def _side(point, line):
 	a = line.p.x
 	b = line.p.y
@@ -211,7 +213,7 @@ class _SLAV:
 		return len(self._lavs) == 0
 
 	def handle_edge_event(self, event):
-		output = []
+		sinks = []
 		events = []
 
 		lav = event.vertex_a.lav
@@ -219,26 +221,25 @@ class _SLAV:
 			log.info("%.2f Peak event at intersection %s from <%s,%s,%s> in %s", event.distance, event.intersection_point, event.vertex_a, event.vertex_b, event.vertex_a.prev, lav)
 			self._lavs.remove(lav)
 			for vertex in list(lav):
-				output.append((vertex.point, event.intersection_point))
+				sinks.append(vertex.point)
 				vertex.invalidate()
 		else:
 			log.info("%.2f Edge event at intersection %s from <%s,%s> in %s", event.distance, event.intersection_point, event.vertex_a, event.vertex_b,lav)
 			new_vertex = lav.unify(event.vertex_a, event.vertex_b, event.intersection_point)
 			if lav.head in (event.vertex_a, event.vertex_b):
 				lav.head = new_vertex
-			for vertex in (event.vertex_a, event.vertex_b):
-				output.append((vertex.point, event.intersection_point))
+			sinks.extend((event.vertex_a.point, event.vertex_b.point))
 			next_event = new_vertex.next_event()
 			if next_event is not None:
 				events.append(next_event)
 
-		return (output, events)
+		return (Subtree(event.intersection_point, event.distance, sinks), events)
 
 	def handle_split_event(self, event):
 		lav = event.vertex.lav
 		log.info("%.2f Split event at intersection %s from vertex %s, for edge %s in %s", event.distance, event.intersection_point, event.vertex, event.opposite_edge, lav)
 
-		output = [(event.vertex.point, event.intersection_point)]
+		sinks = [event.vertex.point]
 		vertices = []
 		x = None   # right vertex
 		y = None   # left vertex
@@ -265,7 +266,7 @@ class _SLAV:
 
 		if x is None:
 			log.info("Failed split event %s (equivalent edge event is expected to follow)", event)
-			return ([],[])
+			return (None,[])
 
 		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, event.opposite_edge)
 		v2 = _LAVertex(event.intersection_point, event.opposite_edge, event.vertex.edge_right)
@@ -296,7 +297,7 @@ class _SLAV:
 				vertices.append(l.head)
 			else:
 				log.info("LAV %s has collapsed into the line %s--%s", l, l.head.point, l.head.next.point)
-				output.append((l.head.point, l.head.next.point))
+				sinks.append(l.head.next.point)
 				for v in list(l):
 					v.invalidate()
 
@@ -307,7 +308,7 @@ class _SLAV:
 				events.append(next_event)
 
 		event.vertex.invalidate()
-		return (output, events)
+		return (Subtree(event.intersection_point, event.distance, sinks), events)
 
 class _LAV:
 	def __init__(self, slav):
@@ -426,7 +427,8 @@ def skeletonize(polygon, holes=None):
 	The polygon should be given as a list of vertices in counter-clockwise order.
 	Holes is a list of the contours of the holes, the vertices of which should be in clockwise order.
 
-	Returns the straight skeleton as a list of edges.
+	Returns the straight skeleton as a list of "subtrees", which are in the form of (source, height, sinks),
+	where source is the highest points, height is its height, and sinks are the point connected to the source.
 	"""
 	slav = _SLAV(polygon, holes)
 	output = []
@@ -444,18 +446,20 @@ def skeletonize(polygon, holes=None):
 				log.info("%.2f Discarded outdated edge event %s", i.distance, i)
 				continue
 
-			(arcs, events) = slav.handle_edge_event(i)
+			(arc, events) = slav.handle_edge_event(i)
 		elif isinstance(i, _SplitEvent):
 			if not i.vertex.is_valid:
 				log.info("%.2f Discarded outdated split event %s", i.distance, i)
 				continue
-			(arcs, events) = slav.handle_split_event(i)
+			(arc, events) = slav.handle_split_event(i)
 
 		prioque.put_all(events)
-		output.extend(arcs)
-		for arc in arcs:
-			_debug.line((arc[0].x, arc[0].y, arc[1].x, arc[1].y), fill="red")
 
-		_debug.show()
+		if arc is not None:
+			output.append(arc)
+			for sink in arc.sinks:
+				_debug.line((arc.source.x, arc.source.y, sink.x, sink.y), fill="red")
+
+			_debug.show()
 	return output
 
