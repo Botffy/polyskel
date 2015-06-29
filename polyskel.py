@@ -199,6 +199,12 @@ class _SLAV:
 		for lav in self._lavs:
 			yield lav
 
+	def __len__(self):
+		return len(self._lavs)
+
+	def empty(self):
+		return len(self._lavs) == 0
+
 	def handle_edge_event(self, event):
 		output = []
 		events = []
@@ -425,7 +431,7 @@ def skeletonize(polygon, holes=None):
 		for vertex in lav:
 			prioque.put(vertex.next_event())
 
-	while not prioque.empty():
+	while not (prioque.empty() or slav.empty()):
 		log.debug("SLAV is %s", [repr(lav) for lav in slav])
 		i = prioque.get()
 		if isinstance(i, _EdgeEvent):
