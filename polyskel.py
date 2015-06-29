@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Implementation of the straight skeleton algorithm as described by Felkel and Obdržálek in their 1998 conference paper Straight skeleton implementation (sans holes)
+Implementation of the straight skeleton algorithm as described by Felkel and Obdržálek in their 1998 conference paper Straight skeleton implementation.
 """
 
 import logging
@@ -110,6 +110,8 @@ class _LAVertex:
 	def next_event(self):
 		events = []
 		if self.is_reflex:
+			# a reflex vertex may generate a split event
+			# split events happen when a vertex hits an opposite edge, splitting the polygon in two.
 			log.debug("looking for split candidates for vertex %s", self)
 			for edge in self.original_edges:
 				if edge.edge == self.edge_left or edge.edge == self.edge_right:
@@ -117,13 +119,15 @@ class _LAVertex:
 
 				log.debug("\tconsidering EDGE %s", edge)
 
-				# choose the "less parallel" edge (in order to exclude a potentially parallel edge)
+				# a potential b is at the intersection of between our own bisector and the bisector of the
+				# angle between the tested edge and any one of our own edges.
+
+				# we choose the "less parallel" edge (in order to exclude a potentially parallel edge)
 				leftdot = abs(self.edge_left.v.normalized().dot(edge.edge.v.normalized()))
 				rightdot = abs(self.edge_right.v.normalized().dot(edge.edge.v.normalized()))
 				selfedge = self.edge_left if leftdot < rightdot else self.edge_right
 				otheredge = self.edge_left if leftdot > rightdot else self.edge_right
 
-				#intersect egde's line with the line of self's edge
 				i = Line2(selfedge).intersect(Line2(edge.edge))
 				if i is not None and not _approximately_equals(i, self.point):
 					#locate candidate b
@@ -142,6 +146,7 @@ class _LAVertex:
 						continue
 
 					#check eligibility of b
+					# a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
 					xleft =  _cross(edge.bisector_left.v.normalized(), (b - edge.bisector_left.p).normalized())  > 0
 					xright = _cross(edge.bisector_right.v.normalized(), (b - edge.bisector_right.p).normalized())  <  0
 					xedge =  _cross(edge.edge.v.normalized(), (b - edge.edge.p).normalized()) < 0
