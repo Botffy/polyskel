@@ -1,0 +1,15 @@
+# straight from Felkel
+30,100
+50, 200
+220,240
+440,240
+430,40
+230,30,
+85,40
+--- # hole separator, vertices of the hole contour are in clockwise order
+175,85
+245,140
+315,90
+385,160
+330,200
+165,180

@@ -7,7 +7,7 @@ Implementation of the straight skeleton algorithm as described by Felkel and Obd
 import logging
 import heapq
 from euclid import *
-from itertools import cycle, chain, islice, izip, tee
+from itertools import *
 from collections import namedtuple
 
 log = logging.getLogger("__name__")
@@ -55,6 +55,10 @@ def _approximately_equals(a, b):
 def _approximately_same(point_a, point_b):
 	return _approximately_equals(point_a.x, point_b.x) and _approximately_equals(point_a.y, point_b.y)
 
+def _normalize_contour(contour):
+	contour = [Point2(float(x), float(y)) for (x,y) in contour]
+	return [point for prev, point, next in _window(contour) if not (point==next or (point-prev).normalized() == (next-point).normalized())]
+
 
 class _SplitEvent(namedtuple("_SplitEvent", "distance, intersection_point, vertex, opposite_edge")):
 	__slots__ = ()
@@ -99,11 +103,15 @@ class _LAVertex:
 	def is_reflex(self):
 		return self._is_reflex
 
+	@property
+	def original_edges(self):
+		return self.lav._slav._original_edges
+
 	def next_event(self):
 		events = []
 		if self.is_reflex:
 			log.debug("looking for split candidates for vertex %s", self)
-			for edge in self.lav.original_polygon:
+			for edge in self.original_edges:
 				if edge.edge == self.edge_left or edge.edge == self.edge_right:
 					continue
 
@@ -114,7 +122,6 @@ class _LAVertex:
 				rightdot = abs(self.edge_right.v.normalized().dot(edge.edge.v.normalized()))
 				selfedge = self.edge_left if leftdot < rightdot else self.edge_right
 				otheredge = self.edge_left if leftdot > rightdot else self.edge_right
-				#selfedge = self.edge_left
 
 				#intersect egde's line with the line of self's edge
 				i = Line2(selfedge).intersect(Line2(edge.edge))
@@ -163,8 +170,10 @@ class _LAVertex:
 		return ev
 
 	def invalidate(self):
-		self._valid = False
-		self.lav = None
+		if self.lav is not None:
+			self.lav.invalidate(self)
+		else:
+			self._valid = False
 
 	@property
 	def is_valid(self):
@@ -177,31 +186,35 @@ class _LAVertex:
 		return "Vertex ({}) ({:.2f};{:.2f}), bisector {}, edges {} {}".format("reflex" if self.is_reflex else "convex", self.point.x, self.point.y, self.bisector, self.edge_left, self.edge_right)
 
 class _SLAV:
-	def __init__(self, polygon):
-		if not isinstance(polygon[0], Point2):
-			polygon = [Point2(float(x), float(y)) for (x,y) in polygon]
+	def __init__(self, polygon, holes):
+		contours = [_normalize_contour(polygon)]
+		contours.extend([_normalize_contour(hole) for hole in holes])
 
-		root = _LAV.from_polygon(polygon, self)
-		self._lavs = [root]
+		self._lavs = [ _LAV.from_polygon(contour, self) for contour in contours ]
 
-		#store original polygon for calculating split events
-		self._polygon = [_OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector) for vertex in root]
+		#store original polygon edges for calculating split events
+		self._original_edges = [_OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector) for vertex in chain.from_iterable(self._lavs)]
 
+	def __iter__(self):
+		for lav in self._lavs:
+			yield lav
 
 	def handle_edge_event(self, event):
 		output = []
 		events = []
 
+		lav = event.vertex_a.lav
 		if event.vertex_a.prev == event.vertex_b.next:
-			log.info("%.2f Peak event at intersection %s from <%s,%s,%s>", event.distance, event.intersection_point, event.vertex_a, event.vertex_b, event.vertex_a.prev)
-			self._lavs.remove(event.vertex_a.lav)
-			for vertex in event.vertex_a.lav:
+			log.info("%.2f Peak event at intersection %s from <%s,%s,%s> in %s", event.distance, event.intersection_point, event.vertex_a, event.vertex_b, event.vertex_a.prev, lav)
+			self._lavs.remove(lav)
+			for vertex in list(lav):
 				output.append((vertex.point, event.intersection_point))
 				vertex.invalidate()
 		else:
-			log.info("%.2f Edge event at intersection %s from <%s,%s>", event.distance, event.intersection_point, event.vertex_a, event.vertex_b)
-			lav = event.vertex_a.lav
+			log.info("%.2f Edge event at intersection %s from <%s,%s> in %s", event.distance, event.intersection_point, event.vertex_a, event.vertex_b,lav)
 			new_vertex = lav.unify(event.vertex_a, event.vertex_b, event.intersection_point)
+			if lav.head in (event.vertex_a, event.vertex_b):
+				lav.head = new_vertex
 			for vertex in (event.vertex_a, event.vertex_b):
 				output.append((vertex.point, event.intersection_point))
 			next_event = new_vertex.next_event()
@@ -211,38 +224,42 @@ class _SLAV:
 		return (output, events)
 
 	def handle_split_event(self, event):
-		log.info("%.2f Split event at intersection %s from vertex %s, for edge %s", event.distance, event.intersection_point, event.vertex, event.opposite_edge)
+		lav = event.vertex.lav
+		log.info("%.2f Split event at intersection %s from vertex %s, for edge %s in %s", event.distance, event.intersection_point, event.vertex, event.opposite_edge, lav)
 
 		output = [(event.vertex.point, event.intersection_point)]
 		vertices = []
-		x = None
-		y = None
-		v1 = None
-		v2 = None
+		x = None   # right vertex
+		y = None   # left vertex
 		norm = event.opposite_edge.v.normalized()
-		for v in event.vertex.lav:
-			xv1 = None
-			xv2 = None
+		for v in chain.from_iterable(self._lavs):
+			log.debug("%s in %s", v, v.lav)
 			if norm == v.edge_left.v.normalized() and event.opposite_edge.p == v.edge_left.p:
-				# if adding hole handling, don't forget boundchecking
-				log.info("Vertex %s holds edge as left edge (%s, %s)", v, xv1, xv2)
 				x = v
 				y = x.prev
-				break
 			elif norm == v.edge_right.v.normalized() and event.opposite_edge.p == v.edge_right.p:
-				log.info("Vertex %s holds edge as right edge (%s, %s)", v, xv1, xv2)
 				y=v
 				x=y.next
-				break
+
+			if x:
+				xleft =  _cross(y.bisector.v.normalized(), (event.intersection_point - y.point).normalized())  >= 0
+				xright = _cross(x.bisector.v.normalized(), (event.intersection_point - x.point).normalized())  <=  0
+				log.debug("Vertex %s holds edge as %s edge (%s, %s)", v, ("left" if x==v else "right"), xleft, xright)
+
+				if xleft and xright:
+					break
+				else:
+					x = None
+					y = None
 
 		if x is None:
-			log.error("FAILED split event %s", event)
-			return ([], [])
+			log.info("Failed split event %s (equivalent edge event is expected to follow)", event)
+			return ([],[])
 
 		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, event.opposite_edge)
 		v2 = _LAVertex(event.intersection_point, event.opposite_edge, event.vertex.edge_right)
 
-		idx = self._lavs.index(event.vertex.lav)
+		idx = self._lavs.index(lav)
 		del self._lavs[idx]
 
 		v1.prev = event.vertex.prev
@@ -257,14 +274,15 @@ class _SLAV:
 
 		new_lavs = [_LAV.from_chain(v1, self), _LAV.from_chain(v2, self)]
 		for l in new_lavs:
+			log.debug(l)
 			if len(l) > 2:
 				self._lavs.insert(idx, l)
 				vertices.append(l.head)
 				idx += 1
 			else:
-				log.info("LAV has collapsed into the line %s--%s", l.head.point, l.head.next.point)
+				log.info("LAV %s has collapsed into the line %s--%s", l, l.head.point, l.head.next.point)
 				output.append((l.head.point, l.head.next.point))
-				for v in l:
+				for v in list(l):
 					v.invalidate()
 
 		events = []
@@ -276,23 +294,17 @@ class _SLAV:
 		event.vertex.invalidate()
 		return (output, events)
 
-	@property
-	def original_polygon(self):
-		return self._polygon
-
 class _LAV:
 	def __init__(self, slav):
 		self.head = None
 		self._slav = slav
 		self._len = 0
+		log.debug("Created LAV %s", self)
 
 
 	@classmethod
 	def from_polygon(cls, polygon, slav):
 		lav = cls(slav)
-
-		polygon = [point for prev, point, next in _window(polygon) if not (point==next or (point-prev).normalized() == (next-point).normalized())]
-
 		for prev, point, next in _window(polygon):
 			lav._len += 1
 			vertex = _LAVertex(point, LineSegment2(prev, point), LineSegment2(point, next))
@@ -316,9 +328,13 @@ class _LAV:
 			vertex.lav = lav
 		return lav
 
-	@property
-	def original_polygon(self):
-		return self._slav.original_polygon
+	def invalidate(self, vertex):
+		assert vertex.lav is self, "Tried to invalidate a vertex that's not mine"
+		log.debug("Invalidating %s", vertex)
+		vertex._valid = False
+		if self.head == vertex:
+			self.head = self.head.next
+		vertex.lav = None
 
 	def unify(self, vertex_a, vertex_b, point):
 		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right, (vertex_b.bisector.v.normalized(), vertex_a.bisector.v.normalized()))
@@ -382,22 +398,25 @@ class _EventQueue:
 		for item in self.__data:
 			print item
 
-def skeletonize(polygon):
+def skeletonize(polygon, holes=None):
 	"""
 	Compute the straight skeleton of a polygon.
 
 	The polygon should be given as a list of vertices in counter-clockwise order.
+	Holes is a list of the contours of the holes, the vertices of which should be in clockwise order.
 
 	Returns the straight skeleton as a list of edges.
 	"""
-	slav = _SLAV(polygon)
+	slav = _SLAV(polygon, holes)
 	output = []
 	prioque = _EventQueue()
 
-	for vertex in slav._lavs[0]: # fixme
-		prioque.put(vertex.next_event())
+	for lav in slav:
+		for vertex in lav:
+			prioque.put(vertex.next_event())
 
 	while not prioque.empty():
+		log.debug("SLAV is %s", slav._lavs)
 		i = prioque.get()
 		if isinstance(i, _EdgeEvent):
 			if not i.vertex_a.is_valid or not i.vertex_b.is_valid:

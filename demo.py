@@ -16,15 +16,27 @@ if __name__ == "__main__":
 	polyskel.log.setLevel(getattr(logging, args.loglevel))
 	polygon_line_pat = re.compile(r"\s*(?P<coord_x>\d+(\.\d+)?)\s*,\s*(?P<coord_y>\d+(\.\d+)?)\s*(#.*)?")
 
+	contours = []
 	poly = []
 	for line in args.polygon_file:
 		line = line.strip()
 		if not line or line.startswith('#'):
 			continue
 
+		if line.startswith('-'):
+			contours.append(poly)
+			poly = []
+			continue
+
 		match = polygon_line_pat.match(line)
 		poly.append((float(match.group("coord_x")), float(match.group("coord_y"))))
 
+	if not args.polygon_file.isatty():
+		args.polygon_file.close()
+
+	contours.append(poly)
+	poly = contours[0]
+	holes = contours[1:] if len(contours) > 0 else None
 	bbox_end_x = int(max(poly, key=lambda x: x[0])[0]+20)
 	bbox_end_y = int(max(poly, key=lambda x: x[1])[1]+20)
 
@@ -34,13 +46,12 @@ if __name__ == "__main__":
 		polyskel.set_debug((im, draw))
 
 
-	if not args.polygon_file.isatty():
-		args.polygon_file.close()
+	for contour in contours:
+		for point, next in zip(contour, contour[1:]+contour[:1]):
+			draw.line((point[0], point[1], next[0], next[1]), fill=0)
 
-	for point, next in zip(poly, poly[1:]+poly[:1]):
-		draw.line((point[0], point[1], next[0], next[1]), fill=0)
+	skeleton = polyskel.skeletonize(poly, holes)
 
-	skeleton = polyskel.skeletonize(poly)
 	for res in skeleton:
 		print res
 
