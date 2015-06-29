@@ -259,9 +259,6 @@ class _SLAV:
 		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, event.opposite_edge)
 		v2 = _LAVertex(event.intersection_point, event.opposite_edge, event.vertex.edge_right)
 
-		idx = self._lavs.index(lav)
-		del self._lavs[idx]
-
 		v1.prev = event.vertex.prev
 		v1.next = x
 		event.vertex.prev.next = v1
@@ -272,13 +269,20 @@ class _SLAV:
 		event.vertex.next.prev = v2
 		y.next = v2
 
-		new_lavs = [_LAV.from_chain(v1, self), _LAV.from_chain(v2, self)]
+		new_lavs = None
+		self._lavs.remove(lav)
+		if lav != x.lav:
+			# the split event actually merges two lavs
+			self._lavs.remove(x.lav)
+			new_lavs = [_LAV.from_chain(v1, self)]
+		else:
+			new_lavs = [_LAV.from_chain(v1, self), _LAV.from_chain(v2, self)]
+
 		for l in new_lavs:
 			log.debug(l)
 			if len(l) > 2:
-				self._lavs.insert(idx, l)
+				self._lavs.append(l)
 				vertices.append(l.head)
-				idx += 1
 			else:
 				log.info("LAV %s has collapsed into the line %s--%s", l, l.head.point, l.head.next.point)
 				output.append((l.head.point, l.head.next.point))
@@ -354,6 +358,12 @@ class _LAV:
 		self._len -= 1
 		return replacement
 
+	def __str__(self):
+		return "LAV {}".format(id(self))
+
+	def __repr__(self):
+		return "{} = {}".format(str(self), [vertex for vertex in self])
+
 	def __len__(self):
 		return self._len
 
@@ -416,7 +426,7 @@ def skeletonize(polygon, holes=None):
 			prioque.put(vertex.next_event())
 
 	while not prioque.empty():
-		log.debug("SLAV is %s", slav._lavs)
+		log.debug("SLAV is %s", [repr(lav) for lav in slav])
 		i = prioque.get()
 		if isinstance(i, _EdgeEvent):
 			if not i.vertex_a.is_valid or not i.vertex_b.is_valid:
