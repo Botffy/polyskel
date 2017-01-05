@@ -5,3 +5,11 @@ In addition, Felkel's algorithm itself is rather dated, more efficient (and more
 For a modern and excellent overview of the topic please refer to Stefan Huber's excellent [Computing Straight Skeleton and Motorcycle Graphs: Theory and Practice](https://www.sthu.org/research/publications/files/phdthesis.pdf).
 
 Use `demo.py <example-file>` for a demonstration.
+
+---
+
+OH WOW, this is actually being used!
+
+Check out [Yongha Hwang's fork](https://github.com/yonghah/polyskel) to see polyskel in [real-life action](https://github.com/yonghah/polyskel/blob/master/Create%20layout%20network%20using%20straight%20skeletons%20.ipynb) <3 <3 <3.
+
+So it's not THAT crap, after all.
