@@ -13,3 +13,5 @@ OH WOW, this is actually being used!
 Check out [Yongha Hwang's fork](https://github.com/yonghah/polyskel) to see polyskel in [real-life action](https://github.com/yonghah/polyskel/blob/master/Create%20layout%20network%20using%20straight%20skeletons%20.ipynb) <3 <3 <3.
 
 So it's not THAT crap, after all.
+
+There is also [a Swift port](https://github.com/andygeers/Polyskel-Swift) available of Yongha Hwang's version.
