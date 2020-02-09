@@ -40,8 +40,8 @@ if __name__ == "__main__":
 	bbox_end_x = int(max(poly, key=lambda x: x[0])[0]+20)
 	bbox_end_y = int(max(poly, key=lambda x: x[1])[1]+20)
 
-	im = Image.new("RGB", (bbox_end_x, bbox_end_y), "white");
-	draw = ImageDraw.Draw(im);
+	im = Image.new("RGB", (bbox_end_x, bbox_end_y), "white")
+	draw = ImageDraw.Draw(im)
 	if args.verbose:
 		polyskel.set_debug((im, draw))
 
@@ -53,9 +53,9 @@ if __name__ == "__main__":
 	skeleton = polyskel.skeletonize(poly, holes)
 
 	for res in skeleton:
-		print res
+		print(res)
 
 	for arc in skeleton:
 		for sink in arc.sinks:
 			draw.line((arc.source.x, arc.source.y, sink.x, sink.y), fill="red")
-	im.show();
+	im.show()

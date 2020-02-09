@@ -6,7 +6,7 @@ Implementation of the straight skeleton algorithm as described by Felkel and Obd
 
 import logging
 import heapq
-from euclid import *
+from euclid3 import *
 from itertools import *
 from collections import namedtuple
 
@@ -47,7 +47,7 @@ def _window(lst):
 	prevs, items, nexts = tee(lst, 3)
 	prevs = islice(cycle(prevs), len(lst) - 1, None)
 	nexts = islice(cycle(nexts), 1, None)
-	return izip(prevs, items, nexts)
+	return zip(prevs, items, nexts)
 
 
 def _cross(a, b):
@@ -71,12 +71,18 @@ def _normalize_contour(contour):
 class _SplitEvent(namedtuple("_SplitEvent", "distance, intersection_point, vertex, opposite_edge")):
 	__slots__ = ()
 
+	def __lt__(self, other):
+		return self.distance < other.distance
+
 	def __str__(self):
 		return "{} Split event @ {} from {} to {}".format(self.distance, self.intersection_point, self.vertex, self.opposite_edge)
 
 
 class _EdgeEvent(namedtuple("_EdgeEvent", "distance intersection_point vertex_a vertex_b")):
 	__slots__ = ()
+
+	def __lt__(self, other):
+		return self.distance < other.distance
 
 	def __str__(self):
 		return "{} Edge event @ {} between {} and {}".format(self.distance, self.intersection_point, self.vertex_a, self.vertex_b)
@@ -85,11 +91,6 @@ class _EdgeEvent(namedtuple("_EdgeEvent", "distance intersection_point vertex_a 
 _OriginalEdge = namedtuple("_OriginalEdge", "edge bisector_left, bisector_right")
 
 Subtree = namedtuple("Subtree", "source, height, sinks")
-
-
-def _side(point, line):
-	a = line.p.x
-	b = line.p.y
 
 
 class _LAVertex:
@@ -218,8 +219,8 @@ class _SLAV:
 
 		# store original polygon edges for calculating split events
 		self._original_edges = [
-			_OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector) for
-			vertex in chain.from_iterable(self._lavs)
+			_OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector)
+			for vertex in chain.from_iterable(self._lavs)
 		]
 
 	def __iter__(self):
@@ -409,12 +410,12 @@ class _LAV:
 			yield cur
 			cur = cur.next
 			if cur == self.head:
-				raise StopIteration
+				return
 
 	def _show(self):
 		cur = self.head
 		while True:
-			print cur.__repr__()
+			print(cur.__repr__())
 			cur = cur.next
 			if cur == self.head:
 				break
@@ -443,7 +444,7 @@ class _EventQueue:
 
 	def show(self):
 		for item in self.__data:
-			print item
+			print(item)
 
 
 def skeletonize(polygon, holes=None):
