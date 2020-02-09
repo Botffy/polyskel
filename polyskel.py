@@ -12,6 +12,7 @@ from collections import namedtuple
 
 log = logging.getLogger("__name__")
 
+
 class Debug:
 	def __init__(self, image):
 		if image is not None:
@@ -33,50 +34,63 @@ class Debug:
 		if self.do:
 			self.im.show()
 
+
 _debug = Debug(None)
+
 
 def set_debug(image):
 	global _debug
 	_debug = Debug(image)
 
+
 def _window(lst):
 	prevs, items, nexts = tee(lst, 3)
-	prevs = islice(cycle(prevs), len(lst)-1, None)
+	prevs = islice(cycle(prevs), len(lst) - 1, None)
 	nexts = islice(cycle(nexts), 1, None)
 	return izip(prevs, items, nexts)
 
+
 def _cross(a, b):
-	res = a.x*b.y - b.x*a.y
+	res = a.x * b.y - b.x * a.y
 	return res
 
+
 def _approximately_equals(a, b):
-	return a==b or (abs(a-b) <= max(abs(a), abs(b)) * 0.001)
+	return a == b or (abs(a - b) <= max(abs(a), abs(b)) * 0.001)
+
 
 def _approximately_same(point_a, point_b):
 	return _approximately_equals(point_a.x, point_b.x) and _approximately_equals(point_a.y, point_b.y)
 
+
 def _normalize_contour(contour):
-	contour = [Point2(float(x), float(y)) for (x,y) in contour]
-	return [point for prev, point, next in _window(contour) if not (point==next or (point-prev).normalized() == (next-point).normalized())]
+	contour = [Point2(float(x), float(y)) for (x, y) in contour]
+	return [point for prev, point, next in _window(contour) if not (point == next or (point-prev).normalized() == (next - point).normalized())]
 
 
 class _SplitEvent(namedtuple("_SplitEvent", "distance, intersection_point, vertex, opposite_edge")):
 	__slots__ = ()
+
 	def __str__(self):
 		return "{} Split event @ {} from {} to {}".format(self.distance, self.intersection_point, self.vertex, self.opposite_edge)
 
+
 class _EdgeEvent(namedtuple("_EdgeEvent", "distance intersection_point vertex_a vertex_b")):
 	__slots__ = ()
+
 	def __str__(self):
 		return "{} Edge event @ {} between {} and {}".format(self.distance, self.intersection_point, self.vertex_a, self.vertex_b)
+
 
 _OriginalEdge = namedtuple("_OriginalEdge", "edge bisector_left, bisector_right")
 
 Subtree = namedtuple("Subtree", "source, height, sinks")
 
+
 def _side(point, line):
 	a = line.p.x
 	b = line.p.y
+
 
 class _LAVertex:
 	def __init__(self, point, edge_left, edge_right, direction_vectors=None):
@@ -86,16 +100,16 @@ class _LAVertex:
 		self.prev = None
 		self.next = None
 		self.lav = None
-		self._valid = True; # this should be handled better. Maybe membership in lav implies validity?
+		self._valid = True  # TODO this might be handled better. Maybe membership in lav implies validity?
 
-		creator_vectors = (edge_left.v.normalized()*-1, edge_right.v.normalized())
+		creator_vectors = (edge_left.v.normalized() * -1, edge_right.v.normalized())
 		if direction_vectors is None:
 			direction_vectors = creator_vectors
 
 		self._is_reflex = (_cross(*direction_vectors)) < 0
 		self._bisector = Ray2(self.point, operator.add(*creator_vectors) * (-1 if self.is_reflex else 1))
 		log.info("Created vertex %s", self.__repr__())
-		_debug.line((self.bisector.p.x, self.bisector.p.y, self.bisector.p.x+self.bisector.v.x*100, self.bisector.p.y+self.bisector.v.y*100), fill="blue")
+		_debug.line((self.bisector.p.x, self.bisector.p.y, self.bisector.p.x + self.bisector.v.x * 100, self.bisector.p.y + self.bisector.v.y * 100), fill="blue")
 
 	@property
 	def bisector(self):
@@ -132,10 +146,10 @@ class _LAVertex:
 
 				i = Line2(selfedge).intersect(Line2(edge.edge))
 				if i is not None and not _approximately_equals(i, self.point):
-					#locate candidate b
+					# locate candidate b
 					linvec = (self.point - i).normalized()
 					edvec = edge.edge.v.normalized()
-					if linvec.dot(edvec)<0:
+					if linvec.dot(edvec) < 0:
 						edvec = -edvec
 
 					bisecvec = edvec + linvec
@@ -147,18 +161,18 @@ class _LAVertex:
 					if b is None:
 						continue
 
-					#check eligibility of b
+					# check eligibility of b
 					# a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
-					xleft =  _cross(edge.bisector_left.v.normalized(), (b - edge.bisector_left.p).normalized())  > 0
-					xright = _cross(edge.bisector_right.v.normalized(), (b - edge.bisector_right.p).normalized())  <  0
-					xedge =  _cross(edge.edge.v.normalized(), (b - edge.edge.p).normalized()) < 0
+					xleft	= _cross(edge.bisector_left.v.normalized(), (b - edge.bisector_left.p).normalized()) > 0
+					xright	= _cross(edge.bisector_right.v.normalized(), (b - edge.bisector_right.p).normalized()) < 0
+					xedge	= _cross(edge.edge.v.normalized(), (b - edge.edge.p).normalized()) < 0
 
 					if not (xleft and xright and xedge):
 						log.debug("\t\tDiscarded candidate %s (%s-%s-%s)", b, xleft, xright, xedge)
 						continue
 
 					log.debug("\t\tFound valid candidate %s", b)
-					events.append( _SplitEvent(Line2(edge.edge).distance(b), b, self, edge.edge) )
+					events.append(_SplitEvent(Line2(edge.edge).distance(b), b, self, edge.edge))
 
 		i_prev = self.bisector.intersect(self.prev.bisector)
 		i_next = self.bisector.intersect(self.next.bisector)
@@ -190,17 +204,23 @@ class _LAVertex:
 		return "Vertex ({:.2f};{:.2f})".format(self.point.x, self.point.y)
 
 	def __repr__(self):
-		return "Vertex ({}) ({:.2f};{:.2f}), bisector {}, edges {} {}".format("reflex" if self.is_reflex else "convex", self.point.x, self.point.y, self.bisector, self.edge_left, self.edge_right)
+		return "Vertex ({}) ({:.2f};{:.2f}), bisector {}, edges {} {}".format("reflex" if self.is_reflex else "convex",
+																			  self.point.x, self.point.y, self.bisector,
+																			  self.edge_left, self.edge_right)
+
 
 class _SLAV:
 	def __init__(self, polygon, holes):
 		contours = [_normalize_contour(polygon)]
 		contours.extend([_normalize_contour(hole) for hole in holes])
 
-		self._lavs = [ _LAV.from_polygon(contour, self) for contour in contours ]
+		self._lavs = [_LAV.from_polygon(contour, self) for contour in contours]
 
-		#store original polygon edges for calculating split events
-		self._original_edges = [_OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector) for vertex in chain.from_iterable(self._lavs)]
+		# store original polygon edges for calculating split events
+		self._original_edges = [
+			_OriginalEdge(LineSegment2(vertex.prev.point, vertex.point), vertex.prev.bisector, vertex.bisector) for
+			vertex in chain.from_iterable(self._lavs)
+		]
 
 	def __iter__(self):
 		for lav in self._lavs:
@@ -218,13 +238,15 @@ class _SLAV:
 
 		lav = event.vertex_a.lav
 		if event.vertex_a.prev == event.vertex_b.next:
-			log.info("%.2f Peak event at intersection %s from <%s,%s,%s> in %s", event.distance, event.intersection_point, event.vertex_a, event.vertex_b, event.vertex_a.prev, lav)
+			log.info("%.2f Peak event at intersection %s from <%s,%s,%s> in %s", event.distance,
+					 event.intersection_point, event.vertex_a, event.vertex_b, event.vertex_a.prev, lav)
 			self._lavs.remove(lav)
 			for vertex in list(lav):
 				sinks.append(vertex.point)
 				vertex.invalidate()
 		else:
-			log.info("%.2f Edge event at intersection %s from <%s,%s> in %s", event.distance, event.intersection_point, event.vertex_a, event.vertex_b,lav)
+			log.info("%.2f Edge event at intersection %s from <%s,%s> in %s", event.distance, event.intersection_point,
+					 event.vertex_a, event.vertex_b, lav)
 			new_vertex = lav.unify(event.vertex_a, event.vertex_b, event.intersection_point)
 			if lav.head in (event.vertex_a, event.vertex_b):
 				lav.head = new_vertex
@@ -237,12 +259,13 @@ class _SLAV:
 
 	def handle_split_event(self, event):
 		lav = event.vertex.lav
-		log.info("%.2f Split event at intersection %s from vertex %s, for edge %s in %s", event.distance, event.intersection_point, event.vertex, event.opposite_edge, lav)
+		log.info("%.2f Split event at intersection %s from vertex %s, for edge %s in %s", event.distance,
+				 event.intersection_point, event.vertex, event.opposite_edge, lav)
 
 		sinks = [event.vertex.point]
 		vertices = []
-		x = None   # right vertex
-		y = None   # left vertex
+		x = None  # right vertex
+		y = None  # left vertex
 		norm = event.opposite_edge.v.normalized()
 		for v in chain.from_iterable(self._lavs):
 			log.debug("%s in %s", v, v.lav)
@@ -250,13 +273,13 @@ class _SLAV:
 				x = v
 				y = x.prev
 			elif norm == v.edge_right.v.normalized() and event.opposite_edge.p == v.edge_right.p:
-				y=v
-				x=y.next
+				y = v
+				x = y.next
 
 			if x:
-				xleft =  _cross(y.bisector.v.normalized(), (event.intersection_point - y.point).normalized())  >= 0
-				xright = _cross(x.bisector.v.normalized(), (event.intersection_point - x.point).normalized())  <=  0
-				log.debug("Vertex %s holds edge as %s edge (%s, %s)", v, ("left" if x==v else "right"), xleft, xright)
+				xleft	= _cross(y.bisector.v.normalized(), (event.intersection_point - y.point).normalized()) >= 0
+				xright	= _cross(x.bisector.v.normalized(), (event.intersection_point - x.point).normalized()) <= 0
+				log.debug("Vertex %s holds edge as %s edge (%s, %s)", v, ("left" if x == v else "right"), xleft, xright)
 
 				if xleft and xright:
 					break
@@ -266,7 +289,7 @@ class _SLAV:
 
 		if x is None:
 			log.info("Failed split event %s (equivalent edge event is expected to follow)", event)
-			return (None,[])
+			return (None, [])
 
 		v1 = _LAVertex(event.intersection_point, event.vertex.edge_left, event.opposite_edge)
 		v2 = _LAVertex(event.intersection_point, event.opposite_edge, event.vertex.edge_right)
@@ -310,13 +333,13 @@ class _SLAV:
 		event.vertex.invalidate()
 		return (Subtree(event.intersection_point, event.distance, sinks), events)
 
+
 class _LAV:
 	def __init__(self, slav):
 		self.head = None
 		self._slav = slav
 		self._len = 0
 		log.debug("Created LAV %s", self)
-
 
 	@classmethod
 	def from_polygon(cls, polygon, slav):
@@ -325,7 +348,7 @@ class _LAV:
 			lav._len += 1
 			vertex = _LAVertex(point, LineSegment2(prev, point), LineSegment2(point, next))
 			vertex.lav = lav
-			if lav.head == None:
+			if lav.head is None:
 				lav.head = vertex
 				vertex.prev = vertex.next = vertex
 			else:
@@ -353,7 +376,8 @@ class _LAV:
 		vertex.lav = None
 
 	def unify(self, vertex_a, vertex_b, point):
-		replacement =_LAVertex(point, vertex_a.edge_left, vertex_b.edge_right, (vertex_b.bisector.v.normalized(), vertex_a.bisector.v.normalized()))
+		replacement = _LAVertex(point, vertex_a.edge_left, vertex_b.edge_right,
+								(vertex_b.bisector.v.normalized(), vertex_a.bisector.v.normalized()))
 		replacement.lav = self
 
 		if self.head in [vertex_a, vertex_b]:
@@ -395,6 +419,7 @@ class _LAV:
 			if cur == self.head:
 				break
 
+
 class _EventQueue:
 	def __init__(self):
 		self.__data = []
@@ -411,7 +436,7 @@ class _EventQueue:
 		return heapq.heappop(self.__data)
 
 	def empty(self):
-		return len(self.__data)==0
+		return len(self.__data) == 0
 
 	def peek(self):
 		return self.__data[0]
@@ -419,6 +444,7 @@ class _EventQueue:
 	def show(self):
 		for item in self.__data:
 			print item
+
 
 def skeletonize(polygon, holes=None):
 	"""
@@ -462,4 +488,3 @@ def skeletonize(polygon, holes=None):
 
 			_debug.show()
 	return output
-
