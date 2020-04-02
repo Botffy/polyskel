@@ -1,3 +1,5 @@
+[![Gittens](http://gittens.r15.railsrumble.com//badge/Botffy/polyskel)](http://gittens.r15.railsrumble.com/gitten/Botffy/polyskel)
+
 # Polyskel
 
 <img src="doc/example.png" alt="A straight skeleton"/>
