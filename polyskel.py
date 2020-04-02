@@ -446,25 +446,26 @@ class _EventQueue:
 		for item in self.__data:
 			print(item)
 
-def merge_sources(skeleton):
-    """ Multiple sources may share same location 
-    :param skeleton:
-    :return:
-    """
-    sources = {}
-    to_remove = []
-    for i, p in enumerate(skeleton):
-        if p.source in sources:
-            source = sources[p.source]
-            # source exists, merge sinks
-            for sink in p.sinks:
-                if sink not in skeleton[source].sinks:
-                    skeleton[source].sinks.append(sink)
-            to_remove.append(i)
-        else:
-            sources[p.source] = i
-    for i in reversed(to_remove):
-        skeleton.pop(i)
+def _merge_sources(skeleton):
+	"""
+	In highly symmetrical shapes with reflex vertices multiple sources may share the same 
+	location. This function merges those sources.
+	"""
+	sources = {}
+	to_remove = []
+	for i, p in enumerate(skeleton):
+		source = tuple(i for i in p.source)
+		if source in sources:
+			source_index = sources[source]
+			# source exists, merge sinks
+			for sink in p.sinks:
+				if sink not in skeleton[source_index].sinks:
+					skeleton[source_index].sinks.append(sink)
+			to_remove.append(i)
+		else:
+			sources[source] = i
+	for i in reversed(to_remove):
+		skeleton.pop(i)
 
 			
 def skeletonize(polygon, holes=None):
@@ -508,5 +509,5 @@ def skeletonize(polygon, holes=None):
 				_debug.line((arc.source.x, arc.source.y, sink.x, sink.y), fill="red")
 
 			_debug.show()
-	merge_sources(output)
+	_merge_sources(output)
 	return output
