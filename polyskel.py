@@ -12,6 +12,7 @@ from collections import namedtuple
 
 log = logging.getLogger("__name__")
 
+EPSILON = 0.00001
 
 class Debug:
 	def __init__(self, image):
@@ -164,9 +165,9 @@ class _LAVertex:
 
 					# check eligibility of b
 					# a valid b should lie within the area limited by the edge and the bisectors of its two vertices:
-					xleft	= _cross(edge.bisector_left.v.normalized(), (b - edge.bisector_left.p).normalized()) > 0
-					xright	= _cross(edge.bisector_right.v.normalized(), (b - edge.bisector_right.p).normalized()) < 0
-					xedge	= _cross(edge.edge.v.normalized(), (b - edge.edge.p).normalized()) < 0
+					xleft	= _cross(edge.bisector_left.v.normalized(), (b - edge.bisector_left.p).normalized()) > EPSILON
+					xright	= _cross(edge.bisector_right.v.normalized(), (b - edge.bisector_right.p).normalized()) < -EPSILON
+					xedge	= _cross(edge.edge.v.normalized(), (b - edge.edge.p).normalized()) < -EPSILON
 
 					if not (xleft and xright and xedge):
 						log.debug("\t\tDiscarded candidate %s (%s-%s-%s)", b, xleft, xright, xedge)
@@ -278,8 +279,8 @@ class _SLAV:
 				x = y.next
 
 			if x:
-				xleft	= _cross(y.bisector.v.normalized(), (event.intersection_point - y.point).normalized()) >= 0
-				xright	= _cross(x.bisector.v.normalized(), (event.intersection_point - x.point).normalized()) <= 0
+				xleft	= _cross(y.bisector.v.normalized(), (event.intersection_point - y.point).normalized()) >= EPSILON
+				xright	= _cross(x.bisector.v.normalized(), (event.intersection_point - x.point).normalized()) <= -EPSILON
 				log.debug("Vertex %s holds edge as %s edge (%s, %s)", v, ("left" if x == v else "right"), xleft, xright)
 
 				if xleft and xright:
