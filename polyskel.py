@@ -475,6 +475,8 @@ def skeletonize(polygon, holes=None):
 
 	The polygon should be given as a list of vertices in counter-clockwise order.
 	Holes is a list of the contours of the holes, the vertices of which should be in clockwise order.
+	
+	Please note that the y-axis goes downwards as far as polyskel is concerned, so specify your ordering accordingly.
 
 	Returns the straight skeleton as a list of "subtrees", which are in the form of (source, height, sinks),
 	where source is the highest points, height is its height, and sinks are the point connected to the source.
