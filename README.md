@@ -35,3 +35,5 @@ The demo parses an input polygon file, and outputs a tree structure representing
 Check out [Yongha Hwang's fork](https://github.com/yonghah/polyskel) to see polyskel in [sweet real-life action](https://github.com/yonghah/polyskel/blob/master/Create%20layout%20network%20using%20straight%20skeletons%20.ipynb) <3 <3 <3.
 
 There is also [a Swift port](https://github.com/andygeers/Polyskel-Swift) available of Yongha Hwang's version.
+
+[bpolyskel](https://github.com/prochitecture/bpypolyskel) is a port for Blender, making [some sweet roofs](https://user-images.githubusercontent.com/613295/94917497-4fd8c800-04b9-11eb-89ba-2f4f47f5b416.png) <3.
